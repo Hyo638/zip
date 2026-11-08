@@ -1,6 +1,11 @@
 // 페이지 → 확장 백그라운드로 전달
 let gotArticles = 0;
 window.addEventListener("message", (e) => {
+  if (e.source !== window) return;
+  if (e.data?.source === "zip-ext-req") safeSend({ type: "save-template", req: e.data.req });
+  if (e.data?.source === "zip-ext-log") log(e.data.info);
+});
+window.addEventListener("message", (e) => {
   if (e.source !== window || e.data?.source !== "zip-ext") return;
   if (/boundedArticles|articleList|articles/i.test(e.data.url)) gotArticles++;
   safeSend({ type: "articles", url: e.data.url, data: e.data.data });
@@ -10,7 +15,17 @@ window.addEventListener("message", (e) => {
 if (window === window.top) {
   chrome.runtime.sendMessage({ type: "am-i-watched" }).then((r) => {
     log({ event: "loaded", watched: !!r?.watched });
-    if (r?.watched) setTimeout(openListThenScroll, 3000 + Math.random() * 15000); // 탭끼리 겹치지 않게 무작위 지연
+    if (!r?.watched) return;
+    const delay = 3000 + Math.random() * 15000; // 탭끼리 겹치지 않게 무작위 지연
+    if (r.template) {
+      // 화면에 안 보이는 탭은 지도가 그려지지 않아 목록 버튼이 없다 → 기록해 둔 목록 요청을 직접 다시 보낸다
+      setTimeout(() => {
+        log({ event: "replay-start", url: r.template.url.slice(0, 120), body: (r.template.body || "").slice(0, 400) });
+        window.postMessage({ source: "zip-ext-replay", req: r.template }, "*");
+      }, delay);
+    } else {
+      setTimeout(openListThenScroll, delay);
+    }
   }).catch(() => {});
 }
 

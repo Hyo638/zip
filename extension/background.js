@@ -6,8 +6,23 @@ async function cfg() {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "am-i-watched") {
-    cfg().then((c) => sendResponse({ watched: Object.values(c.watchTabs).includes(sender.tab?.id) }));
+    cfg().then(async (c) => {
+      const url = Object.keys(c.watchTabs).find((u) => c.watchTabs[u] === sender.tab?.id);
+      const { templates = {} } = await chrome.storage.local.get("templates");
+      sendResponse({ watched: !!url, template: url ? templates[url] : null });
+    });
     return true;
+  }
+  if (msg?.type === "save-template") {
+    // 감시 탭에서 사용자가(또는 확장이) 목록을 열었을 때의 요청 형식을 그 감시 주소에 저장
+    cfg().then(async (c) => {
+      const url = Object.keys(c.watchTabs).find((u) => c.watchTabs[u] === sender.tab?.id);
+      if (!url) return;
+      const { templates = {} } = await chrome.storage.local.get("templates");
+      if (!templates[url]) debug({ event: "template-saved", body: (msg.req.body || "").slice(0, 400), reqUrl: msg.req.url.slice(0, 150) });
+      templates[url] = msg.req;
+      await chrome.storage.local.set({ templates });
+    });
   }
   if (msg?.type === "articles") send(msg);
   if (msg?.type === "debug") debug({ ...msg.info, tab: sender.tab?.id, url: sender.tab?.url });
