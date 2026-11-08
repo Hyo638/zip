@@ -6,7 +6,9 @@
   body { font: 13px -apple-system, system-ui, sans-serif; width: 280px; margin: 0; padding: 14px; color: #0a0a0a; }
   h1 { font-size: 15px; margin: 0 0 10px; }
   label { display: block; margin: 10px 0 4px; font-weight: 500; }
-  input, select { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #e5e5e5; border-radius: 6px; font: inherit; }
+  textarea { resize: vertical; font-size: 11px; }
+  button.secondary { background: #f5f5f5; color: #171717; margin-top: 6px; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #e5e5e5; border-radius: 6px; font: inherit; }
   button { margin-top: 12px; width: 100%; padding: 7px; border: 0; border-radius: 6px; background: #171717; color: #fff; font: inherit; cursor: pointer; }
   .muted { color: #737373; font-size: 12px; margin-top: 10px; line-height: 1.5; }
 </style>
@@ -15,7 +17,9 @@
   <h1>집찾기 수집기</h1>
   <label for="server">집찾기 서버 주소</label>
   <input id="server" />
-  <label for="refresh">네이버 탭 자동 새로고침</label>
+  <label for="urls">감시할 네이버 부동산 주소 (한 줄에 하나)</label>
+  <textarea id="urls" rows="5" placeholder="https://fin.land.naver.com/..."></textarea>
+  <label for="refresh">자동 새로고침</label>
   <select id="refresh">
     <option value="0">끄기</option>
     <option value="3">3분마다</option>
@@ -24,8 +28,9 @@
     <option value="30">30분마다</option>
   </select>
   <button id="save">저장</button>
+  <button id="now" class="secondary">지금 새로고침</button>
   <div class="muted" id="status"></div>
-  <div class="muted">네이버 부동산에서 원하는 지역·단지의 매물 목록을 열어 두면 화면에 받은 매물이 자동으로 전송됩니다.</div>
+  <div class="muted">동네별로 네이버 부동산에서 매물 목록을 연 뒤 주소창 주소를 붙여넣으세요. 저장한 주소는 고정 탭으로 열려 주기적으로 새로고침됩니다.</div>
   <script src="popup.js"></script>
 </body>
 </html>

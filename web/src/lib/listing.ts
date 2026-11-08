@@ -8,6 +8,8 @@ export type Listing = {
   rent: number | null; // 만원 (월세)
   mgmtFee: number | null; // 만원 (관리비)
   address: string | null;
+  dong: string | null; // 법정동 이름 (송도동 등)
+  estateType: string; // 아파트 | 오피스텔 | ...
   imageUrl: string | null;
   area: number | null; // 전용면적 ㎡
   floor: string | null;
@@ -22,7 +24,9 @@ export type Listing = {
 };
 
 export type Filters = {
-  tradeType: string; // "all" | 매매 | 전세 | 월세
+  tradeTypes: string[]; // 비어 있으면 전체
+  estateTypes: string[];
+  dongs: string[];
   priceMin: string;
   priceMax: string;
   rentMax: string;
@@ -34,8 +38,19 @@ export type Filters = {
   notify: boolean;
 };
 
+export const DONG_OPTIONS = [
+  { dong: "송도동", label: "연수구 송도동" },
+  { dong: "용현동", label: "미추홀구 용현동" },
+  { dong: "청라동", label: "서해구 청라동" },
+  { dong: "구월동", label: "남동구 구월동" },
+];
+export const TRADE_OPTIONS = ["매매", "전세", "월세"];
+export const ESTATE_OPTIONS = ["아파트", "오피스텔"];
+
 export const defaultFilters: Filters = {
-  tradeType: "all",
+  tradeTypes: ["전세", "월세"],
+  estateTypes: ["아파트", "오피스텔"],
+  dongs: ["송도동", "용현동", "청라동", "구월동"],
   priceMin: "",
   priceMax: "",
   rentMax: "",
@@ -50,7 +65,9 @@ export const defaultFilters: Filters = {
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 
 export function matches(l: Listing, f: Filters): boolean {
-  if (f.tradeType !== "all" && l.tradeType !== f.tradeType) return false;
+  if (f.tradeTypes.length && !f.tradeTypes.includes(l.tradeType)) return false;
+  if (f.estateTypes.length && !f.estateTypes.includes(l.estateType)) return false;
+  if (f.dongs.length && !(l.dong && f.dongs.includes(l.dong))) return false;
   const pMin = num(f.priceMin), pMax = num(f.priceMax);
   if (pMin !== null && (l.price ?? -1) < pMin) return false;
   if (pMax !== null && (l.price ?? Infinity) > pMax) return false;

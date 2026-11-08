@@ -1,4 +1,4 @@
-const DEFAULTS = { server: "http://localhost:3000", refreshMin: 0, sent: 0, lastStatus: "" };
+const DEFAULTS = { server: "http://localhost:3000", refreshMin: 0, sent: 0, lastStatus: "", watchUrls: [], watchTabs: {} };
 
 async function cfg() {
   return { ...DEFAULTS, ...(await chrome.storage.local.get(Object.keys(DEFAULTS))) };
@@ -7,6 +7,7 @@ async function cfg() {
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === "articles") send(msg);
   if (msg?.type === "config-changed") schedule();
+  if (msg?.type === "refresh-now") refreshAll();
 });
 
 async function send(msg) {
@@ -34,11 +35,33 @@ async function schedule() {
   if (c.refreshMin > 0) chrome.alarms.create("refresh", { periodInMinutes: Number(c.refreshMin) });
 }
 
-chrome.alarms.onAlarm.addListener(async (a) => {
-  if (a.name !== "refresh") return;
-  const tabs = await chrome.tabs.query({ url: "*://*.land.naver.com/*" });
-  for (const t of tabs) chrome.tabs.reload(t.id);
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === "refresh") refreshAll();
 });
+
+// 감시 주소가 있으면 그 주소들을 고정 탭으로 열어 두고 새로고침, 없으면 열린 네이버 부동산 탭 전부 새로고침
+async function refreshAll() {
+  const c = await cfg();
+  if (!c.watchUrls.length) {
+    const tabs = await chrome.tabs.query({ url: "*://*.land.naver.com/*" });
+    for (const t of tabs) chrome.tabs.reload(t.id);
+    return;
+  }
+  const watchTabs = {};
+  for (const url of c.watchUrls) {
+    const id = c.watchTabs[url];
+    let tab = null;
+    if (id) tab = await chrome.tabs.get(id).catch(() => null);
+    if (tab) {
+      await chrome.tabs.reload(tab.id);
+    } else {
+      tab = await chrome.tabs.create({ url, active: false, pinned: true });
+    }
+    watchTabs[url] = tab.id;
+    await new Promise((r) => setTimeout(r, 3000)); // 네이버에 한꺼번에 요청하지 않도록 간격 두기
+  }
+  await chrome.storage.local.set({ watchTabs });
+}
 
 chrome.runtime.onInstalled.addListener(schedule);
 chrome.runtime.onStartup.addListener(schedule);

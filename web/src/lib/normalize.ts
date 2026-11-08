@@ -38,6 +38,8 @@ function direction(v: string | null): string | null {
   return set.map((c) => DIR[c]).join("") + "향";
 }
 
+const ESTATE: Record<string, string> = { A01: "아파트", APT: "아파트", A02: "오피스텔", OPST: "오피스텔", B01: "분양권", ABYG: "분양권" };
+
 const TRADE: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기임대" };
 
 /** 응답 JSON 어디에 있든 매물 객체를 찾아낸다 (네이버 응답 형식이 바뀌어도 버티도록). */
@@ -84,6 +86,11 @@ export function normalize(o: Raw, now: number): Listing | null {
     price: finPrice !== undefined ? finPrice : parsePrice(pick(flat, PRICE_KEYS)),
     rent: pi ? won(pi.rentPrice) : parsePrice(pick(flat, ["rentPrc", "rentPrice", "monthlyRent"])),
     mgmtFee: pi ? won(pi.managementFeeAmount) : null,
+    dong: str(addr?.sector ?? pick(flat, ["cortarName", "dongNm"])),
+    estateType: (() => {
+      const e = str(pick(flat, ["realEstateType", "realEstateTypeCode", "rletTpCd", "realEstateTypeName", "rletTpNm"])) ?? "";
+      return ESTATE[e] ?? e;
+    })(),
     address: addr ? [addr.division, addr.sector].filter(Boolean).join(" ") || null : null,
     imageUrl: str(media?.imageUrl ?? pick(flat, ["representativeImgUrl", "repImgUrl"])),
     area: areaRaw !== undefined && !isNaN(Number(areaRaw)) ? Number(areaRaw) : null,

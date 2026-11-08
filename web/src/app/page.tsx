@@ -8,12 +8,36 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { defaultFilters, formatPrice, matches, type Filters, type Listing } from "@/lib/listing";
+import { DONG_OPTIONS, ESTATE_OPTIONS, TRADE_OPTIONS, defaultFilters, formatPrice, matches, type Filters, type Listing } from "@/lib/listing";
 
-const FILTER_KEY = "zip.filters";
+const FILTER_KEY = "zip.filters.v2";
+
+function ChipGroup({ label, options, value, onChange }: { label: string; options: { value: string; label: string }[]; value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => {
+          const on = value.includes(o.value);
+          return (
+            <Button
+              key={o.value}
+              type="button"
+              size="sm"
+              variant={on ? "default" : "outline"}
+              aria-pressed={on}
+              onClick={() => onChange(on ? value.filter((x) => x !== o.value) : [...value, o.value])}
+            >
+              {o.label}
+            </Button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function timeAgo(ts: number | null) {
   if (!ts) return "아직 없음";
@@ -108,17 +132,9 @@ export default function Page() {
             <CardDescription>가격은 만원 단위, 면적은 전용 ㎡</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>거래 유형</Label>
-              <Select value={filters.tradeType} onValueChange={(v) => update("tradeType", v ?? "all")}>
-                <SelectTrigger className="w-full"><SelectValue>{(v: string) => (v === "all" ? "전체" : v)}</SelectValue></SelectTrigger>
-                <SelectContent>
-                  {["all", "매매", "전세", "월세"].map((t) => (
-                    <SelectItem key={t} value={t}>{t === "all" ? "전체" : t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ChipGroup label="동네" options={DONG_OPTIONS.map((d) => ({ value: d.dong, label: d.label }))} value={filters.dongs} onChange={(v) => update("dongs", v)} />
+            <ChipGroup label="매물 종류" options={ESTATE_OPTIONS.map((o) => ({ value: o, label: o }))} value={filters.estateTypes} onChange={(v) => update("estateTypes", v)} />
+            <ChipGroup label="거래 유형" options={TRADE_OPTIONS.map((o) => ({ value: o, label: o }))} value={filters.tradeTypes} onChange={(v) => update("tradeTypes", v)} />
             <div className="space-y-2">
               <Label>가격 / 보증금</Label>
               <div className="flex items-center gap-2">
@@ -190,6 +206,7 @@ export default function Page() {
                         {l.status === "new" && <Badge className="bg-emerald-600 hover:bg-emerald-600">NEW</Badge>}
                         {l.status === "changed" && <Badge className="bg-amber-500 hover:bg-amber-500">가격변동</Badge>}
                         <Badge variant="secondary">{l.tradeType || "?"}</Badge>
+                        {l.estateType && <Badge variant="outline">{l.estateType}</Badge>}
                         <span className="font-medium">{l.name}</span>
                       </div>
                       <div className="text-xl font-semibold">
