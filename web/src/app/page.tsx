@@ -98,7 +98,11 @@ function DongColumn({ label, items }: { label: string; items: Listing[] }) {
     const arr = [...items];
     if (sort === "price") arr.sort((a, b) => (a.price ?? 0) - (b.price ?? 0) || (a.rent ?? 0) - (b.rent ?? 0));
     else if (sort === "area") arr.sort((a, b) => (b.area ?? 0) - (a.area ?? 0));
-    else arr.sort((a, b) => b.firstSeen - a.firstSeen);
+    else {
+      // 최신순: 확인매물 날짜가 최근인 순, 같은 날이면 먼저 수집된 새 매물이 위로
+      const ymd = (l: Listing) => (l.confirmed ?? "").replace(/\D/g, "").slice(0, 8);
+      arr.sort((a, b) => ymd(b).localeCompare(ymd(a)) || b.firstSeen - a.firstSeen);
+    }
     return arr;
   }, [items, sort]);
   const fresh = items.filter((l) => l.status !== "seen").length;
