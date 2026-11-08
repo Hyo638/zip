@@ -12,6 +12,8 @@ export type Listing = {
   estateType: string; // 아파트 | 오피스텔 | ...
   imageUrl: string | null;
   area: number | null; // 전용면적 ㎡
+  supplyArea?: number | null; // 공급(오피스텔은 계약)면적 ㎡
+  verification?: string | null; // 집주인 | 현장 | 확인매물
   floor: string | null;
   direction: string | null;
   desc: string | null;

@@ -2,42 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bell, ExternalLink, Home, Radio } from "lucide-react";
+import { Bell, Home, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { DONG_OPTIONS, ESTATE_OPTIONS, TRADE_OPTIONS, defaultFilters, formatPrice, matches, type Filters, type Listing } from "@/lib/listing";
+import { DONG_OPTIONS, defaultFilters, formatPrice, matches, type Listing } from "@/lib/listing";
+import { cn } from "@/lib/utils";
 
-const FILTER_KEY = "zip.filters.v2";
+const NOTIFY_KEY = "zip.notify";
 
-function ChipGroup({ label, options, value, onChange }: { label: string; options: { value: string; label: string }[]; value: string[]; onChange: (v: string[]) => void }) {
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((o) => {
-          const on = value.includes(o.value);
-          return (
-            <Button
-              key={o.value}
-              type="button"
-              size="sm"
-              variant={on ? "default" : "outline"}
-              aria-pressed={on}
-              onClick={() => onChange(on ? value.filter((x) => x !== o.value) : [...value, o.value])}
-            >
-              {o.label}
-            </Button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+type Sort = "latest" | "price" | "area";
+const SORTS: { key: Sort; label: string }[] = [
+  { key: "latest", label: "최신순" },
+  { key: "price", label: "가격순" },
+  { key: "area", label: "면적순" },
+];
 
 function timeAgo(ts: number | null) {
   if (!ts) return "아직 없음";
@@ -47,19 +27,130 @@ function timeAgo(ts: number | null) {
   return `${Math.round(s / 3600)}시간 전`;
 }
 
+function priceText(l: Listing) {
+  const deposit = formatPrice(l.price);
+  return l.rent ? `${l.tradeType} ${deposit}/${l.rent.toLocaleString()}` : `${l.tradeType} ${deposit}`;
+}
+
+function formatDate(d: string | null) {
+  if (!d) return null;
+  const m = d.replace(/-/g, "").match(/^(\d{4})(\d{2})(\d{2})/);
+  return m ? `${m[1]}.${m[2]}.${m[3]}` : d;
+}
+
+function ListingCard({ l }: { l: Listing }) {
+  const area = l.area
+    ? l.supplyArea
+      ? `${Math.round(l.supplyArea)}㎡ (전용${l.area})`
+      : `전용 ${l.area}㎡`
+    : null;
+  return (
+    <a
+      href={l.url}
+      target="_blank"
+      rel="noreferrer"
+      className={cn(
+        "block rounded-xl border bg-card p-4 shadow-xs transition-colors hover:bg-accent/50",
+        l.status === "new" && "border-emerald-500/70",
+        l.status === "changed" && "border-amber-500/70",
+      )}
+    >
+      <div className="flex gap-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center gap-1.5">
+            {l.status === "new" && <Badge className="bg-emerald-600 px-1.5 text-[10px]">NEW</Badge>}
+            {l.status === "changed" && <Badge className="bg-amber-500 px-1.5 text-[10px]">가격변동</Badge>}
+            <span className="truncate text-sm text-muted-foreground">{l.name}</span>
+          </div>
+          <div className="text-lg font-bold leading-tight">
+            {priceText(l)}
+            {l.status === "changed" && l.prevPrice !== null && (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground line-through">{formatPrice(l.prevPrice)}</span>
+            )}
+          </div>
+          <div className="text-[13px] text-muted-foreground">
+            {[l.estateType, area, l.floor && `${l.floor}층`, l.direction].filter(Boolean).join(" | ")}
+          </div>
+          {l.mgmtFee ? <div className="text-xs text-muted-foreground">관리비 {l.mgmtFee}만</div> : null}
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {l.verification && l.verification !== "확인매물" && (
+              <span className={cn("rounded px-1.5 py-0.5 text-xs", l.verification === "집주인" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300")}>
+                {l.verification}
+              </span>
+            )}
+            {l.confirmed && (
+              <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600 dark:bg-red-950 dark:text-red-300">확인매물 {formatDate(l.confirmed)}</span>
+            )}
+          </div>
+        </div>
+        {l.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={l.imageUrl} alt="" referrerPolicy="no-referrer" className="size-20 shrink-0 rounded-lg object-cover" />
+        )}
+      </div>
+    </a>
+  );
+}
+
+function DongColumn({ label, items }: { label: string; items: Listing[] }) {
+  const [sort, setSort] = useState<Sort>("latest");
+  const sorted = useMemo(() => {
+    const arr = [...items];
+    if (sort === "price") arr.sort((a, b) => (a.price ?? 0) - (b.price ?? 0) || (a.rent ?? 0) - (b.rent ?? 0));
+    else if (sort === "area") arr.sort((a, b) => (b.area ?? 0) - (a.area ?? 0));
+    else arr.sort((a, b) => b.firstSeen - a.firstSeen);
+    return arr;
+  }, [items, sort]);
+  const fresh = items.filter((l) => l.status !== "seen").length;
+
+  return (
+    <section className="flex min-h-[60vh] flex-col rounded-2xl border bg-muted/40 md:min-h-0">
+      <div className="rounded-t-2xl border-b bg-background px-4 py-3">
+        <h2 className="text-center text-base font-semibold">{label}</h2>
+      </div>
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="text-sm font-semibold">
+          매물 <span className="text-emerald-600">{items.length}</span>
+          {fresh > 0 && <span className="ml-1.5 text-xs font-normal text-emerald-600">새 {fresh}</span>}
+        </div>
+        <div className="flex items-center text-xs">
+          {SORTS.map((s, i) => (
+            <span key={s.key} className="flex items-center">
+              {i > 0 && <span className="mx-1.5 text-border">|</span>}
+              <button
+                type="button"
+                onClick={() => setSort(s.key)}
+                className={sort === s.key ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground"}
+              >
+                {s.label}
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 pb-3">
+        {sorted.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">아직 받은 매물이 없습니다.</p>
+        ) : (
+          sorted.map((l) => <ListingCard key={l.id} l={l} />)
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function Page() {
   const [listings, setListings] = useState<Listing[]>([]);
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [notify, setNotify] = useState(true);
   const [connected, setConnected] = useState(false);
   const [lastIngest, setLastIngest] = useState<number | null>(null);
   const [, tick] = useState(0);
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(FILTER_KEY);
-      if (saved) setFilters({ ...defaultFilters, ...JSON.parse(saved) });
+      if (localStorage.getItem(NOTIFY_KEY) === "off") setNotify(false);
     } catch {}
     fetch("/api/listings")
       .then((r) => r.json())
@@ -77,14 +168,14 @@ export default function Page() {
       setListings((prev) => {
         const map = new Map(prev.map((l) => [l.id, l]));
         for (const it of items) map.set(it.id, it);
-        return [...map.values()].sort((a, b) => b.firstSeen - a.firstSeen);
+        return [...map.values()];
       });
-      const hits = items.filter((l) => matches(l, { ...filtersRef.current, onlyFresh: false }));
+      const hits = items.filter((l) => matches(l, defaultFilters));
       for (const l of hits.slice(0, 5)) {
-        const title = l.status === "changed" ? "가격 변동" : "새 매물";
-        const body = `${l.name} · ${l.tradeType} ${formatPrice(l.price)}${l.rent ? `/${l.rent}` : ""}`;
+        const title = l.status === "changed" ? "가격 변동" : `새 매물 · ${l.dong}`;
+        const body = `${l.name} · ${priceText(l)}`;
         toast(title, { description: body, action: { label: "보기", onClick: () => window.open(l.url, "_blank") } });
-        if (filtersRef.current.notify && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        if (notifyRef.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
           new Notification(`${title} — 집찾기`, { body });
         }
       }
@@ -96,146 +187,48 @@ export default function Page() {
     };
   }, []);
 
-  const update = <K extends keyof Filters>(k: K, v: Filters[K]) => {
-    const next = { ...filters, [k]: v };
-    setFilters(next);
+  const toggleNotify = (v: boolean) => {
+    setNotify(v);
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify(next));
+      localStorage.setItem(NOTIFY_KEY, v ? "on" : "off");
     } catch {}
-    if (k === "notify" && v && typeof Notification !== "undefined") Notification.requestPermission();
+    if (v && typeof Notification !== "undefined") Notification.requestPermission();
   };
 
-  const shown = useMemo(() => listings.filter((l) => matches(l, filters)), [listings, filters]);
-  const freshCount = shown.filter((l) => l.status !== "seen").length;
+  const byDong = useMemo(() => {
+    const shown = listings.filter((l) => matches(l, defaultFilters));
+    return DONG_OPTIONS.map((d) => ({ ...d, items: shown.filter((l) => l.dong === d.dong) }));
+  }, [listings]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col px-4 py-4 md:h-dvh">
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Home className="size-6" />
-          <h1 className="text-2xl font-semibold tracking-tight">집찾기</h1>
+          <Home className="size-5" />
+          <h1 className="text-xl font-semibold tracking-tight">집찾기</h1>
+          <span className="hidden text-sm text-muted-foreground sm:inline">아파트·오피스텔 · 전세·월세</span>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <Radio className={`size-4 ${connected ? "text-emerald-500" : "text-muted-foreground"}`} />
+            <Radio className={cn("size-4", connected ? "text-emerald-500" : "text-muted-foreground")} />
             {connected ? "실시간 연결됨" : "연결 끊김"}
           </span>
           <Separator orientation="vertical" className="h-4" />
           <span>마지막 수신 {timeAgo(lastIngest)}</span>
+          <Separator orientation="vertical" className="h-4" />
+          <Label htmlFor="notify" className="flex cursor-pointer items-center gap-1.5 font-normal">
+            <Bell className="size-4" />
+            알림
+          </Label>
+          <Switch id="notify" checked={notify} onCheckedChange={toggleNotify} />
         </div>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-[300px_1fr]">
-        <Card className="h-fit md:sticky md:top-6">
-          <CardHeader>
-            <CardTitle>원하는 조건</CardTitle>
-            <CardDescription>가격은 만원 단위, 면적은 전용 ㎡</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ChipGroup label="동네" options={DONG_OPTIONS.map((d) => ({ value: d.dong, label: d.label }))} value={filters.dongs} onChange={(v) => update("dongs", v)} />
-            <ChipGroup label="매물 종류" options={ESTATE_OPTIONS.map((o) => ({ value: o, label: o }))} value={filters.estateTypes} onChange={(v) => update("estateTypes", v)} />
-            <ChipGroup label="거래 유형" options={TRADE_OPTIONS.map((o) => ({ value: o, label: o }))} value={filters.tradeTypes} onChange={(v) => update("tradeTypes", v)} />
-            <div className="space-y-2">
-              <Label>가격 / 보증금</Label>
-              <div className="flex items-center gap-2">
-                <Input inputMode="numeric" placeholder="최소" value={filters.priceMin} onChange={(e) => update("priceMin", e.target.value)} />
-                <span className="text-muted-foreground">~</span>
-                <Input inputMode="numeric" placeholder="최대" value={filters.priceMax} onChange={(e) => update("priceMax", e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>월세 최대</Label>
-              <Input inputMode="numeric" placeholder="예: 100" value={filters.rentMax} onChange={(e) => update("rentMax", e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>전용면적</Label>
-              <div className="flex items-center gap-2">
-                <Input inputMode="numeric" placeholder="최소" value={filters.areaMin} onChange={(e) => update("areaMin", e.target.value)} />
-                <span className="text-muted-foreground">~</span>
-                <Input inputMode="numeric" placeholder="최대" value={filters.areaMax} onChange={(e) => update("areaMax", e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>단지명·설명 키워드</Label>
-              <Input placeholder="예: 래미안, 역세권" value={filters.keyword} onChange={(e) => update("keyword", e.target.value)} />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <Label htmlFor="low">저층 제외</Label>
-              <Switch id="low" checked={filters.excludeLowFloor} onCheckedChange={(v) => update("excludeLowFloor", v)} />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="fresh">새 매물·가격변동만</Label>
-              <Switch id="fresh" checked={filters.onlyFresh} onCheckedChange={(v) => update("onlyFresh", v)} />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="notify" className="flex items-center gap-1.5"><Bell className="size-4" />데스크톱 알림</Label>
-              <Switch id="notify" checked={filters.notify} onCheckedChange={(v) => update("notify", v)} />
-            </div>
-            <Button variant="outline" className="w-full" onClick={() => { setFilters(defaultFilters); try { localStorage.removeItem(FILTER_KEY); } catch {} }}>
-              조건 초기화
-            </Button>
-          </CardContent>
-        </Card>
-
-        <section>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-lg font-medium">조건에 맞는 매물 {shown.length}건</h2>
-            <span className="text-sm text-muted-foreground">새 매물·변동 {freshCount}건 / 전체 수집 {listings.length}건</span>
-          </div>
-
-          {shown.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                {listings.length === 0
-                  ? "아직 받은 매물이 없습니다. 크롬 확장을 켠 상태로 네이버 부동산에서 원하는 지역의 매물 목록을 열어 주세요."
-                  : "조건에 맞는 매물이 없습니다. 조건을 넓혀 보세요."}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {shown.map((l) => (
-                <Card key={l.id} className={l.status === "new" ? "border-emerald-500/60" : l.status === "changed" ? "border-amber-500/60" : ""}>
-                  <CardContent className="flex flex-wrap items-start justify-between gap-3">
-                    {l.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={l.imageUrl} alt="" referrerPolicy="no-referrer" className="size-24 shrink-0 rounded-md object-cover" />
-                    )}
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {l.status === "new" && <Badge className="bg-emerald-600 hover:bg-emerald-600">NEW</Badge>}
-                        {l.status === "changed" && <Badge className="bg-amber-500 hover:bg-amber-500">가격변동</Badge>}
-                        <Badge variant="secondary">{l.tradeType || "?"}</Badge>
-                        {l.estateType && <Badge variant="outline">{l.estateType}</Badge>}
-                        <span className="font-medium">{l.name}</span>
-                      </div>
-                      <div className="text-xl font-semibold">
-                        {formatPrice(l.price)}
-                        {l.rent ? <span> / {l.rent.toLocaleString()}</span> : null}
-                        {l.status === "changed" && l.prevPrice !== null && (
-                          <span className="ml-2 text-sm font-normal text-muted-foreground line-through">{formatPrice(l.prevPrice)}</span>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {[l.address, l.area && `전용 ${l.area}㎡ (${(l.area / 3.3058).toFixed(1)}평)`, l.floor && `${l.floor}층`, l.direction, l.mgmtFee && `관리비 ${l.mgmtFee}만`, l.confirmed && `확인 ${l.confirmed}`]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </div>
-                      {l.desc && <p className="line-clamp-2 text-sm">{l.desc}</p>}
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <a href={l.url} target="_blank" rel="noreferrer" className={buttonVariants({ size: "sm", variant: "outline" })}>
-                        네이버에서 보기 <ExternalLink />
-                      </a>
-                      <span className="text-xs text-muted-foreground">수집 {timeAgo(l.firstSeen)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+      <main className="grid flex-1 grid-cols-1 gap-3 md:min-h-0 md:grid-cols-2 xl:grid-cols-4">
+        {byDong.map((d) => (
+          <DongColumn key={d.dong} label={d.label} items={d.items} />
+        ))}
+      </main>
     </div>
   );
 }

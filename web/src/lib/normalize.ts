@@ -93,6 +93,17 @@ export function normalize(o: Raw, now: number): Listing | null {
     })(),
     address: addr ? [addr.division, addr.sector].filter(Boolean).join(" ") || null : null,
     imageUrl: str(media?.imageUrl ?? pick(flat, ["representativeImgUrl", "repImgUrl"])),
+    supplyArea: (() => {
+      const sp = o.spaceInfo as Raw | undefined;
+      if (!sp) return null;
+      const v = Number(ESTATE[String(o.realEstateType)] === "오피스텔" ? sp.contractSpace || sp.supplySpace : sp.supplySpace || sp.contractSpace);
+      return v > 0 ? v : null;
+    })(),
+    verification: (() => {
+      const t = str((o.verificationInfo as Raw | undefined)?.verificationType);
+      if (!t) return null;
+      return t === "OWNER" ? "집주인" : t === "SITE" || t.startsWith("S_") ? "현장" : "확인매물";
+    })(),
     area: areaRaw !== undefined && !isNaN(Number(areaRaw)) ? Number(areaRaw) : null,
     floor: str(pick(flat, ["floorInfo", "flrInfo", "floor"])),
     direction: direction(str(pick(flat, ["direction", "direcNm", "directionName"]))),
