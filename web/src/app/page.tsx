@@ -49,11 +49,7 @@ function ListingCard({ l }: { l: Listing }) {
       href={l.url}
       target="_blank"
       rel="noreferrer"
-      className={cn(
-        "block rounded-xl border bg-card p-4 shadow-xs transition-colors hover:bg-accent/50",
-        l.status === "new" && "border-emerald-500/70",
-        l.status === "changed" && "border-amber-500/70",
-      )}
+      className="block rounded-xl border border-neutral-200 bg-card p-4 shadow-xs transition-colors hover:bg-accent/50 dark:border-neutral-800"
     >
       <div className="flex gap-3">
         <div className="min-w-0 flex-1 space-y-1">
