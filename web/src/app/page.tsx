@@ -38,6 +38,14 @@ function formatDate(d: string | null) {
   return m ? `${m[1]}.${m[2]}.${m[3]}` : d;
 }
 
+// 단지 이름(뒤의 동 번호 제외)으로 구글 이미지 검색을 연다. 카드 전체 링크(네이버)로는 넘어가지 않게 막는다.
+function openImageSearch(e: React.SyntheticEvent, l: Listing) {
+  e.preventDefault();
+  e.stopPropagation();
+  const complex = l.name.replace(/\s+\S*\d+\S*$/, "").trim() || l.name;
+  window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(complex)}`, "_blank", "noopener");
+}
+
 function ListingCard({ l }: { l: Listing }) {
   const area = l.area
     ? l.supplyArea
@@ -56,7 +64,16 @@ function ListingCard({ l }: { l: Listing }) {
           <div className="flex items-center gap-1.5">
             {l.status === "new" && <Badge className="bg-emerald-600 px-1.5 text-[10px]">NEW</Badge>}
             {l.status === "changed" && <Badge className="bg-amber-500 px-1.5 text-[10px]">가격변동</Badge>}
-            <span className="truncate text-sm text-muted-foreground">{l.name}</span>
+            <span
+              role="link"
+              tabIndex={0}
+              title="구글 이미지에서 보기"
+              onClick={(e) => openImageSearch(e, l)}
+              onKeyDown={(e) => e.key === "Enter" && openImageSearch(e, l)}
+              className="cursor-pointer truncate text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              {l.name}
+            </span>
           </div>
           <div className="text-lg font-bold leading-tight">
             {priceText(l)}
