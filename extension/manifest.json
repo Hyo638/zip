@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "집찾기 수집기",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "네이버 부동산에서 보고 있는 매물 목록을 로컬 집찾기 사이트로 보냅니다.",
   "permissions": ["storage", "alarms", "tabs"],
   "host_permissions": ["*://*.land.naver.com/*", "http://localhost/*"],

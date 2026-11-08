@@ -7,8 +7,29 @@ window.addEventListener("message", (e) => {
 // 감시 탭이면: 페이지가 뜬 뒤 매물 목록을 끝까지 자동 스크롤해서 남은 매물도 불러오게 한다.
 if (window === window.top) {
   chrome.runtime.sendMessage({ type: "am-i-watched" }).then((r) => {
-    if (r?.watched) setTimeout(autoScroll, 3000);
+    if (r?.watched) setTimeout(openListThenScroll, 3000);
   }).catch(() => {});
+}
+
+// 새로고침 직후에는 매물 목록 패널이 닫혀 있어서, 지도 위 "매물 215" 버튼을 눌러 목록을 연다
+async function openListThenScroll() {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 10; i++) {
+    const panelOpen = [...document.querySelectorAll("h1,h2,h3,div,span")].some(
+      (el) => el.childElementCount === 0 && el.textContent.trim() === "매물 목록",
+    );
+    if (panelOpen) break;
+    const btn = [...document.querySelectorAll("button, a, [role=button]")].find((el) =>
+      /^매물\s*[\d,]+$/.test(el.textContent.replace(/\s+/g, " ").trim()),
+    );
+    if (btn) {
+      btn.click();
+      await sleep(2500);
+      break;
+    }
+    await sleep(1000);
+  }
+  autoScroll();
 }
 
 // 화면에서 가장 큰 스크롤 가능한 영역(=매물 목록)을 찾는다
