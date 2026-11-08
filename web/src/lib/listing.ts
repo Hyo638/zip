@@ -8,6 +8,8 @@ export type Listing = {
   rent: number | null; // 만원 (월세)
   mgmtFee: number | null; // 만원 (관리비)
   address: string | null;
+  lat?: number | null;
+  lon?: number | null;
   dong: string | null; // 법정동 이름 (송도동 등)
   estateType: string; // 아파트 | 오피스텔 | ...
   imageUrl: string | null;
@@ -96,4 +98,21 @@ export function formatPrice(v: number | null): string {
   if (eok && man) return `${eok}억 ${man.toLocaleString()}`;
   if (eok) return `${eok}억`;
   return man.toLocaleString();
+}
+
+import { STATIONS } from "./stations";
+
+/** 가장 가까운 역과 도보 시간(분). 직선거리 × 1.3(실제 길 보정) ÷ 분당 70m 로 어림잡는다. */
+export function nearestStation(l: Listing): { name: string; minutes: number; meters: number } | null {
+  if (l.lat == null || l.lon == null) return null;
+  let best: { name: string; d: number } | null = null;
+  for (const [name, lat, lon] of STATIONS) {
+    const dy = (lat - l.lat) * 111_000;
+    const dx = (lon - l.lon) * 111_000 * Math.cos((l.lat * Math.PI) / 180);
+    const d = Math.hypot(dx, dy);
+    if (!best || d < best.d) best = { name, d };
+  }
+  if (!best) return null;
+  const walk = best.d * 1.3;
+  return { name: best.name, meters: Math.round(walk), minutes: Math.max(1, Math.round(walk / 70)) };
 }

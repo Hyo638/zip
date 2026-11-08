@@ -62,7 +62,8 @@ export function ingest(data: unknown) {
       store.listings.set(n.id, upd);
       changed.push(upd);
     } else {
-      store.listings.set(n.id, { ...prev, lastSeen: now });
+      // 변동 없음: 새로 읽을 수 있게 된 항목(좌표·사진 등)은 채워 넣고 상태·첫 수집 시각은 유지
+      store.listings.set(n.id, { ...prev, ...n, firstSeen: prev.firstSeen, prevPrice: prev.prevPrice, status: prev.status, lastSeen: now });
     }
   }
   if (total) {

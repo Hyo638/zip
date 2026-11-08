@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bell, Home, Radio } from "lucide-react";
+import { Bell, Home, Radio, TrainFront } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { DONG_OPTIONS, defaultFilters, formatPrice, matches, type Listing } from "@/lib/listing";
+import { DONG_OPTIONS, defaultFilters, formatPrice, matches, nearestStation, type Listing } from "@/lib/listing";
 import { cn } from "@/lib/utils";
 
 const NOTIFY_KEY = "zip.notify";
@@ -84,6 +84,16 @@ function ListingCard({ l }: { l: Listing }) {
           <div className="text-[13px] text-muted-foreground">
             {[l.estateType, area, l.floor && `${l.floor}층`, l.direction].filter(Boolean).join(" | ")}
           </div>
+          {(() => {
+            const st = nearestStation(l);
+            return st ? (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <TrainFront className="size-3.5" />
+                {st.name}역 도보 {st.minutes}분
+                <span className="text-muted-foreground/70">({st.meters >= 1000 ? `${(st.meters / 1000).toFixed(1)}km` : `${st.meters}m`})</span>
+              </div>
+            ) : null;
+          })()}
           {l.mgmtFee ? <div className="text-xs text-muted-foreground">관리비 {l.mgmtFee}만</div> : null}
           {l.brokerCount && l.brokerCount > 1 ? (
             <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400">중개사 {l.brokerCount}곳에서 등록</div>

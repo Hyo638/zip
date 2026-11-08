@@ -123,6 +123,8 @@ export function normalize(o: Raw, now: number): Listing | null {
       const e = str(pick(flat, ["realEstateType", "realEstateTypeCode", "rletTpCd", "realEstateTypeName", "rletTpNm"])) ?? "";
       return ESTATE[e] ?? e;
     })(),
+    lat: (() => { const c = addr?.coordinates as Raw | undefined; const v = Number(c?.yCoordinate ?? pick(flat, ["latitude", "lat"])); return v ? v : null; })(),
+    lon: (() => { const c = addr?.coordinates as Raw | undefined; const v = Number(c?.xCoordinate ?? pick(flat, ["longitude", "lng", "lon"])); return v ? v : null; })(),
     address: addr ? [addr.division, addr.sector].filter(Boolean).join(" ") || null : null,
     imageUrl: str(media?.imageUrl ?? pick(flat, ["representativeImgUrl", "repImgUrl"])),
     supplyArea: (() => {
