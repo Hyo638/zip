@@ -11,7 +11,7 @@ const FRESH_MS = 24 * 60 * 60 * 1000; // 24시간 동안 new/changed 표시 유�
 
 type Store = { listings: Map<string, Listing>; bus: EventEmitter; lastIngest: number | null };
 
-const g = globalThis as unknown as { __zipStoreV4?: Store };
+const g = globalThis as unknown as { __zipStoreV5?: Store };
 
 function load(): Store {
   const listings = new Map<string, Listing>();
@@ -25,7 +25,7 @@ function load(): Store {
   return { listings, bus, lastIngest: null };
 }
 
-export const store: Store = (g.__zipStoreV4 ??= load());
+export const store: Store = (g.__zipStoreV5 ??= load());
 
 function persist() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
