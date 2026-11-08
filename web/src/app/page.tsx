@@ -97,7 +97,7 @@ function ListingCard({ l }: { l: Listing }) {
           const c = commute(l);
           if (!st && !c) return null;
           return (
-            <div className="w-full space-y-0.5 rounded-[4px] bg-muted px-2 py-1.5">
+            <div className="w-full space-y-1.5 rounded-[6px] bg-muted px-2.5 py-2">
               {st && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <TrainFront className="size-3.5" />
