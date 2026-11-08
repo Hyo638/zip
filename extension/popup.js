@@ -7,6 +7,12 @@ chrome.storage.local.get(["server", "token", "refreshMin", "sent", "lastStatus",
   $("status").textContent = `누적 전송 ${c.sent || 0}건${c.lastStatus ? ` · 최근: ${c.lastStatus}` : ""}`;
 });
 $("save").onclick = async () => {
+  const token = $("token").value.trim();
+  if (/[^\x21-\x7e]/.test(token)) {
+    $("save").textContent = "토큰은 영문·숫자·기호만 쓸 수 있어요 (한글·공백 X)";
+    setTimeout(() => ($("save").textContent = "저장"), 2500);
+    return;
+  }
   await chrome.storage.local.set({ server: $("server").value.trim().replace(/\/$/, ""), token: $("token").value.trim(), refreshMin: Number($("refresh").value),
     watchUrls: $("urls").value.split("\n").map((u) => u.trim()).filter((u) => /^https:\/\/[^/]*land\.naver\.com\//.test(u)),
   });
