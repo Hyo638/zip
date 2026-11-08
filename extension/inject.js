@@ -71,26 +71,29 @@
     try { payload = body ? JSON.parse(body) : null; } catch {}
     const report = (info) => window.postMessage({ source: "zip-ext-log", info }, "*");
     let pages = 0, total = 0;
-    for (let i = 0; i < 30; i++) {
-      let reqUrl = url;
-      if (payload) {
-        if (i === 0) { delete payload.lastInfo; if ("page" in payload) payload.page = 0; }
-      } else if (i > 0) break;
+    const seen = new Set();
+    // 네이버 목록은 articlePagingRequest.lastInfo(직전 응답의 result.lastInfo)로 다음 페이지를 요청한다
+    const paging = payload?.articlePagingRequest;
+    if (paging) paging.lastInfo = [];
+    delete payload?.lastInfo;
+    for (let i = 0; i < 40; i++) {
       try {
-        const res = await window.fetch(reqUrl, { method, headers, body: payload ? JSON.stringify(payload) : undefined, credentials: "include" });
+        const res = await window.fetch(url, { method, headers, body: payload ? JSON.stringify(payload) : undefined, credentials: "include" });
         const j = await res.json();
         pages++;
-        total += j?.result?.list?.length || 0;
-        if (!j?.result?.hasNextPage) break;
-        if (payload && "lastInfo" in (j.result || {})) payload.lastInfo = j.result.lastInfo;
-        else if (payload && "page" in payload) payload.page++;
-        else break;
+        const list = j?.result?.list || [];
+        const ids = list.map((x) => JSON.stringify(x).match(/"articleNumber":"(\d+)"/)?.[1]).filter(Boolean);
+        const fresh = ids.filter((id) => !seen.has(id));
+        ids.forEach((id) => seen.add(id));
+        total += list.length;
+        if (!j?.result?.hasNextPage || !paging || !j.result.lastInfo || (ids.length && !fresh.length)) break;
+        paging.lastInfo = j.result.lastInfo;
       } catch (err) {
         report({ event: "replay-error", message: String(err).slice(0, 200) });
         break;
       }
       await sleep(1200 + Math.random() * 800);
     }
-    report({ event: "replay-done", pages, total, bodyKeys: payload ? Object.keys(payload) : null });
+    report({ event: "replay-done", pages, total, unique: seen.size, dong: payload?.filter?.legalDivisionNumbers?.[0] });
   });
 })();

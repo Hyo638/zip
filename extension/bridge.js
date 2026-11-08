@@ -26,7 +26,7 @@ if (window === window.top) {
         for (const req of r.templates) {
           log({ event: "replay-start", body: (req.body || "").slice(0, 200) });
           window.postMessage({ source: "zip-ext-replay", req }, "*");
-          await new Promise((res) => setTimeout(res, 20000)); // 지역 하나 끝까지 받을 시간
+          await new Promise((res) => setTimeout(res, 30000)); // 지역 하나 끝까지 받을 시간
         }
       }, delay);
     } else {
