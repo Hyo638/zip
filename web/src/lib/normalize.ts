@@ -27,6 +27,17 @@ export function parsePrice(v: unknown): number | null {
 const str = (v: unknown) =>
   v === undefined || v === null || v === "" ? null : String(v);
 
+const won = (v: unknown) => (typeof v === "number" && v > 0 ? Math.round(v / 10000) : null);
+
+const DIR: Record<string, string> = { S: "남", N: "북", E: "동", W: "서" };
+/** "SS" → 남향, "WN" → 북서향, "SE" → 남동향 */
+function direction(v: string | null): string | null {
+  if (!v || !/^[NSEW]{1,2}$/.test(v)) return v;
+  const set = [...new Set(v.split(""))];
+  set.sort((a, b) => "SNEW".indexOf(a) - "SNEW".indexOf(b));
+  return set.map((c) => DIR[c]).join("") + "향";
+}
+
 const TRADE: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기임대" };
 
 /** 응답 JSON 어디에 있든 매물 객체를 찾아낸다 (네이버 응답 형식이 바뀌어도 버티도록). */
@@ -57,6 +68,11 @@ export function normalize(o: Raw, now: number): Listing | null {
   }
   const tradeRaw = str(pick(flat, ["tradeTypeName", "tradTpNm", "tradeType", "tradTpCd", "tradeTypeCode"])) ?? "";
   const tradeType = TRADE[tradeRaw] ?? tradeRaw;
+  // 새 네이버 부동산(fin.land): priceInfo 안에 원 단위 금액
+  const pi = o.priceInfo as Raw | undefined;
+  const addr = o.address as Raw | undefined;
+  const media = (o.articleMediaDto ?? o.articleMedia) as Raw | undefined;
+  const finPrice = pi ? (won(pi.dealPrice) ?? won(pi.warrantyPrice) ?? 0) : undefined;
   const areaRaw = pick(flat, ["area2", "spc2", "exclusiveArea", "exclusiveSpace"]);
   return {
     id,
@@ -65,13 +81,16 @@ export function normalize(o: Raw, now: number): Listing | null {
         .filter(Boolean)
         .join(" ") || "이름 없음",
     tradeType,
-    price: parsePrice(pick(flat, PRICE_KEYS)),
-    rent: parsePrice(pick(flat, ["rentPrc", "rentPrice", "monthlyRent"])),
+    price: finPrice !== undefined ? finPrice : parsePrice(pick(flat, PRICE_KEYS)),
+    rent: pi ? won(pi.rentPrice) : parsePrice(pick(flat, ["rentPrc", "rentPrice", "monthlyRent"])),
+    mgmtFee: pi ? won(pi.managementFeeAmount) : null,
+    address: addr ? [addr.division, addr.sector].filter(Boolean).join(" ") || null : null,
+    imageUrl: str(media?.imageUrl ?? pick(flat, ["representativeImgUrl", "repImgUrl"])),
     area: areaRaw !== undefined && !isNaN(Number(areaRaw)) ? Number(areaRaw) : null,
     floor: str(pick(flat, ["floorInfo", "flrInfo", "floor"])),
-    direction: str(pick(flat, ["direction", "direcNm", "directionName"])),
+    direction: direction(str(pick(flat, ["direction", "direcNm", "directionName"]))),
     desc: str(pick(flat, ["articleFeatureDesc", "atclFetrDesc", "articleFeatureDescription", "description"])),
-    confirmed: str(pick(flat, ["articleConfirmYmd", "cfmYmd", "confirmDate", "exposureStartDate"])),
+    confirmed: str(pick(flat, ["articleConfirmYmd", "articleConfirmDate", "cfmYmd", "confirmDate", "exposureStartDate"])),
     url: `https://fin.land.naver.com/articles/${id}`,
     firstSeen: now,
     lastSeen: now,

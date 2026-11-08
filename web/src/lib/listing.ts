@@ -6,6 +6,9 @@ export type Listing = {
   tradeType: string; // 매매 | 전세 | 월세 | 단기임대 ...
   price: number | null; // 만원 (매매가 또는 보증금)
   rent: number | null; // 만원 (월세)
+  mgmtFee: number | null; // 만원 (관리비)
+  address: string | null;
+  imageUrl: string | null;
   area: number | null; // 전용면적 ㎡
   floor: string | null;
   direction: string | null;

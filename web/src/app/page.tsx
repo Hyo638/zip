@@ -181,7 +181,11 @@ export default function Page() {
               {shown.map((l) => (
                 <Card key={l.id} className={l.status === "new" ? "border-emerald-500/60" : l.status === "changed" ? "border-amber-500/60" : ""}>
                   <CardContent className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
+                    {l.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={l.imageUrl} alt="" referrerPolicy="no-referrer" className="size-24 shrink-0 rounded-md object-cover" />
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         {l.status === "new" && <Badge className="bg-emerald-600 hover:bg-emerald-600">NEW</Badge>}
                         {l.status === "changed" && <Badge className="bg-amber-500 hover:bg-amber-500">가격변동</Badge>}
@@ -196,7 +200,7 @@ export default function Page() {
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {[l.area && `전용 ${l.area}㎡ (${(l.area / 3.3058).toFixed(1)}평)`, l.floor && `${l.floor}층`, l.direction, l.confirmed && `확인 ${l.confirmed}`]
+                        {[l.address, l.area && `전용 ${l.area}㎡ (${(l.area / 3.3058).toFixed(1)}평)`, l.floor && `${l.floor}층`, l.direction, l.mgmtFee && `관리비 ${l.mgmtFee}만`, l.confirmed && `확인 ${l.confirmed}`]
                           .filter(Boolean)
                           .join(" · ")}
                       </div>
