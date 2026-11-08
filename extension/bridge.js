@@ -10,7 +10,7 @@ window.addEventListener("message", (e) => {
 if (window === window.top) {
   chrome.runtime.sendMessage({ type: "am-i-watched" }).then((r) => {
     log({ event: "loaded", watched: !!r?.watched });
-    if (r?.watched) setTimeout(openListThenScroll, 3000);
+    if (r?.watched) setTimeout(openListThenScroll, 3000 + Math.random() * 15000); // 탭끼리 겹치지 않게 무작위 지연
   }).catch(() => {});
 }
 

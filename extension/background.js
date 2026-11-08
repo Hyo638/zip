@@ -53,19 +53,28 @@ async function refreshAll() {
     for (const t of tabs) chrome.tabs.reload(t.id);
     return;
   }
+  // 서비스 워커는 기다리는 동안 꺼질 수 있어서 여기서는 기다리지 않는다.
+  // 탭마다 간격은 각 탭(bridge.js)이 무작위로 늦게 시작해서 만든다.
   const watchTabs = {};
   for (const url of c.watchUrls) {
     const id = c.watchTabs[url];
     let tab = null;
     if (id) tab = await chrome.tabs.get(id).catch(() => null);
+    if (tab && !/tradeTypes=B1-B2/.test(tab.url || "") && /tradeTypes=/.test(url)) {
+      await chrome.tabs.remove(tab.id).catch(() => {}); // 예전(월세만) 주소로 열린 탭은 닫고 새로 연다
+      tab = null;
+    }
     if (tab) {
+      watchTabs[url] = tab.id;
+      await chrome.storage.local.set({ watchTabs: { ...c.watchTabs, ...watchTabs } });
       await chrome.tabs.reload(tab.id);
     } else {
-      tab = await chrome.tabs.create({ url, active: false, pinned: true });
+      // 원하는 거래유형(전세 B1 + 월세 B2)이 항상 포함되도록 주소를 맞춘다
+      const openUrl = url.replace(/tradeTypes=[^&]*/, "tradeTypes=B1-B2");
+      tab = await chrome.tabs.create({ url: openUrl, active: false, pinned: true });
+      watchTabs[url] = tab.id;
+      await chrome.storage.local.set({ watchTabs: { ...c.watchTabs, ...watchTabs } });
     }
-    watchTabs[url] = tab.id;
-    await chrome.storage.local.set({ watchTabs: { ...c.watchTabs, ...watchTabs } }); // 탭이 뜨기 전에 감시 탭으로 등록
-    await new Promise((r) => setTimeout(r, 15000)); // 한 탭의 자동 스크롤이 어느 정도 끝난 뒤 다음 탭으로
   }
   await chrome.storage.local.set({ watchTabs });
 }
