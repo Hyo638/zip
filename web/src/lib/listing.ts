@@ -50,7 +50,7 @@ export const TRADE_OPTIONS = ["매매", "전세", "월세"];
 export const ESTATE_OPTIONS = ["아파트", "오피스텔"];
 
 export const defaultFilters: Filters = {
-  tradeTypes: ["전세", "월세"],
+  tradeTypes: ["월세"],
   estateTypes: ["아파트", "오피스텔"],
   dongs: ["송도동", "청라동", "구월동"],
   priceMin: "",

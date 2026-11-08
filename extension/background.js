@@ -25,8 +25,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!dongCode) return; // 지도 화면 범위로만 걸러진 요청은 다른 동 매물이 섞이므로 쓰지 않는다
       delete j.lastInfo;
       if ("page" in j) j.page = 0;
-      j.filter.tradeTypes = ["B1", "B2"]; // 원하는 거래유형: 전세 + 월세
-      j.filter.realEstateTypes = ["A01", "A02"]; // 아파트 + 오피스텔
       const body = JSON.stringify(j);
       let { templates = [] } = await chrome.storage.local.get("templates");
       if (!Array.isArray(templates)) templates = [];
@@ -88,18 +86,12 @@ async function refreshAll() {
     const id = c.watchTabs[url];
     let tab = null;
     if (id) tab = await chrome.tabs.get(id).catch(() => null);
-    if (tab && !/tradeTypes=B1-B2/.test(tab.url || "") && /tradeTypes=/.test(url)) {
-      await chrome.tabs.remove(tab.id).catch(() => {}); // 예전(월세만) 주소로 열린 탭은 닫고 새로 연다
-      tab = null;
-    }
     if (tab) {
       watchTabs[url] = tab.id;
       await chrome.storage.local.set({ watchTabs: { ...c.watchTabs, ...watchTabs } });
       await chrome.tabs.reload(tab.id);
     } else {
-      // 원하는 거래유형(전세 B1 + 월세 B2)이 항상 포함되도록 주소를 맞춘다
-      const openUrl = url.replace(/tradeTypes=[^&]*/, "tradeTypes=B1-B2");
-      tab = await chrome.tabs.create({ url: openUrl, active: false, pinned: true });
+      tab = await chrome.tabs.create({ url, active: false, pinned: true });
       watchTabs[url] = tab.id;
       await chrome.storage.local.set({ watchTabs: { ...c.watchTabs, ...watchTabs } });
     }

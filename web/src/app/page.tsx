@@ -213,7 +213,7 @@ export default function Page() {
         <div className="flex items-center gap-2">
           <Home className="size-5" />
           <h1 className="text-xl font-semibold tracking-tight">집찾기</h1>
-          <span className="hidden text-sm text-muted-foreground sm:inline">아파트·오피스텔 · 전세·월세</span>
+          <span className="hidden text-sm text-muted-foreground sm:inline">아파트·오피스텔 · 월세</span>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
