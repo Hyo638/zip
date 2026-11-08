@@ -25,6 +25,7 @@ export type Listing = {
   firstSeen: number;
   lastSeen: number;
   prevPrice: number | null;
+  prevRent?: number | null;
   status: ListingStatus;
 };
 

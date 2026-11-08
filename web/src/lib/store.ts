@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { Listing } from "./listing";
+import { defaultFilters, matches, type Listing } from "./listing";
 import { extractArticles, normalize } from "./normalize";
 
 /**
@@ -13,6 +13,12 @@ import { extractArticles, normalize } from "./normalize";
 const FRESH_MS = 24 * 60 * 60 * 1000; // 24시간 동안 new/changed 표시 유지
 const HASH = "zip:listings";
 const META = "zip:lastIngest";
+const EVENTS = "zip:events";
+const MAX_EVENTS = 300;
+// 한 번에 이보다 많이 "새 매물"이 오면 첫 수집(동기화)으로 보고 알림을 만들지 않는다
+const BULK_THRESHOLD = 10;
+
+export type ListingEvent = { type: "new" | "changed"; at: number; listing: Listing };
 
 const REDIS_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -34,16 +40,21 @@ async function redis<T = unknown>(cmd: (string | number)[]): Promise<T> {
 const DATA_DIR = path.join(process.cwd(), "data");
 const FILE = path.join(DATA_DIR, "listings.json");
 const VERSION = 4;
-type FileStore = { listings: Map<string, Listing>; lastIngest: number | null };
+type FileStore = { listings: Map<string, Listing>; lastIngest: number | null; events: ListingEvent[] };
 const g = globalThis as unknown as { __zipFileStore?: FileStore };
 function fileStore(): FileStore {
-  if (g.__zipFileStore) return g.__zipFileStore;
+  if (g.__zipFileStore) {
+    g.__zipFileStore.events ??= []; // 이전 버전 메모리 저장소 호환
+    return g.__zipFileStore;
+  }
   const listings = new Map<string, Listing>();
   try {
     const saved = JSON.parse(fs.readFileSync(FILE, "utf8"));
     if (saved?.version === VERSION) for (const l of saved.listings as Listing[]) listings.set(l.id, l);
   } catch {}
-  return (g.__zipFileStore = { listings, lastIngest: null });
+  let events: ListingEvent[] = [];
+  try { events = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "events.json"), "utf8")); } catch {}
+  return (g.__zipFileStore = { listings, lastIngest: null, events });
 }
 function persistFile() {
   const s = fileStore();
@@ -74,6 +85,24 @@ async function putMany(items: Listing[], now: number) {
   await redis(["SET", META, now]);
 }
 
+async function pushEvents(events: ListingEvent[]) {
+  if (!events.length) return;
+  if (!usingRedis) {
+    const s = fileStore();
+    s.events = [...events.reverse(), ...s.events].slice(0, MAX_EVENTS);
+    try { fs.writeFileSync(path.join(DATA_DIR, "events.json"), JSON.stringify(s.events)); } catch {}
+    return;
+  }
+  await redis(["LPUSH", EVENTS, ...events.map((e) => JSON.stringify(e))]);
+  await redis(["LTRIM", EVENTS, 0, MAX_EVENTS - 1]);
+}
+
+export async function recentEvents(limit = 100): Promise<ListingEvent[]> {
+  if (!usingRedis) return fileStore().events.slice(0, limit);
+  const rows = await redis<string[]>(["LRANGE", EVENTS, 0, limit - 1]);
+  return rows.map((r) => JSON.parse(r));
+}
+
 export async function allListings(): Promise<{ listings: Listing[]; lastIngest: number | null }> {
   let list: Listing[];
   let lastIngest: number | null;
@@ -102,7 +131,7 @@ export async function ingest(data: unknown) {
   const fresh = extractArticles(data)
     .map((raw) => normalize(raw, now))
     .filter((n): n is Listing => !!n);
-  if (!fresh.length) return { total: 0, changed: 0 };
+  if (!fresh.length) return { total: 0, changed: 0, notify: [] };
 
   const prevs = await getMany(fresh.map((n) => n.id));
   const out: Listing[] = [];
@@ -113,7 +142,7 @@ export async function ingest(data: unknown) {
       out.push(n);
       changed++;
     } else if (n.price !== null && prev.price !== null && (n.price !== prev.price || n.rent !== prev.rent)) {
-      out.push({ ...prev, ...n, firstSeen: prev.firstSeen, prevPrice: prev.price, status: "changed" });
+      out.push({ ...prev, ...n, firstSeen: prev.firstSeen, prevPrice: prev.price, prevRent: prev.rent, status: "changed" });
       changed++;
     } else {
       // 변동 없음: 새로 읽을 수 있게 된 항목(좌표·사진 등)은 채우고 상태·첫 수집 시각은 유지
@@ -121,5 +150,21 @@ export async function ingest(data: unknown) {
     }
   });
   await putMany(out, now);
-  return { total: fresh.length, changed };
+
+  // 원하는 조건(동·종류·월세)에 맞는 새 매물/가격변동만 알림으로 남긴다
+  const evts: ListingEvent[] = [];
+  out.forEach((l, i) => {
+    const prev = prevs[i];
+    const type = !prev ? "new" : prev.price !== l.price || prev.rent !== l.rent ? "changed" : null;
+    if (type && matches(l, defaultFilters)) evts.push({ type, at: now, listing: l });
+  });
+  const newCount = evts.filter((e) => e.type === "new").length;
+  const notify = newCount > BULK_THRESHOLD ? evts.filter((e) => e.type === "changed") : evts;
+  await pushEvents(notify);
+  return {
+    total: fresh.length,
+    changed,
+    // 확장이 크롬 알림을 띄울 수 있게 알림 대상 요약을 돌려준다
+    notify: notify.map((e) => ({ type: e.type, id: e.listing.id, dong: e.listing.dong, name: e.listing.name, price: e.listing.price, rent: e.listing.rent, tradeType: e.listing.tradeType, url: e.listing.url })),
+  };
 }

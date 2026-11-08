@@ -51,6 +51,7 @@ async function send(msg) {
     });
     if (r.status === 401) throw new Error("토큰이 맞지 않습니다");
     const j = await r.json();
+    if (j.notify?.length) showNotifications(j.notify);
     await chrome.storage.local.set({
       sent: c.sent + (j.total || 0),
       lastStatus: `${new Date().toLocaleTimeString()} · ${j.total ?? 0}건 전송, 새/변동 ${j.changed ?? 0}건`,
@@ -108,3 +109,41 @@ async function debug(info) {
   const c = await cfg();
   fetch(`${c.server}/api/debug`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(info) }).catch(() => {});
 }
+
+// ---------- 크롬 알림 ----------
+const money = (v) => {
+  if (v == null) return "-";
+  const eok = Math.floor(v / 10000), man = v % 10000;
+  return eok && man ? `${eok}억 ${man.toLocaleString()}` : eok ? `${eok}억` : man.toLocaleString();
+};
+const ICON = chrome.runtime.getURL("icon.png");
+
+function showNotifications(items) {
+  const shown = items.slice(0, 3);
+  for (const it of shown) {
+    const title = `${it.type === "changed" ? "가격 변동" : "새 매물"} · ${it.dong ?? ""}`;
+    const price = `${it.tradeType} ${money(it.price)}${it.rent ? "/" + it.rent : ""}`;
+    chrome.notifications.create(`zip|${it.url}|${Date.now()}|${it.id}`, {
+      type: "basic",
+      iconUrl: ICON,
+      title,
+      message: `${it.name}\n${price}`,
+      priority: 2,
+    });
+  }
+  if (items.length > shown.length) {
+    chrome.notifications.create(`zip|summary|${Date.now()}`, {
+      type: "basic",
+      iconUrl: ICON,
+      title: "집찾기",
+      message: `외 ${items.length - shown.length}건의 새 알림이 있습니다`,
+    });
+  }
+}
+
+chrome.notifications.onClicked.addListener(async (id) => {
+  const [, url] = id.split("|");
+  const c = await cfg();
+  chrome.tabs.create({ url: url && url !== "summary" ? url : c.server });
+  chrome.notifications.clear(id);
+});

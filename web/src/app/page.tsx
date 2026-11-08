@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DONG_OPTIONS, OFFICE, commute, commuteUrl, defaultFilters, formatPrice, matches, nearestStation, type Listing } from "@/lib/listing";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +79,7 @@ function ListingCard({ l }: { l: Listing }) {
           <div className="text-lg font-bold leading-tight">
             {priceText(l)}
             {l.status === "changed" && l.prevPrice !== null && (
-              <span className="ml-1.5 text-xs font-normal text-muted-foreground line-through">{formatPrice(l.prevPrice)}</span>
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground line-through">{formatPrice(l.prevPrice)}{l.prevRent ? `/${l.prevRent}` : ""}</span>
             )}
           </div>
           <div className="text-[13px] text-muted-foreground">
@@ -199,11 +200,75 @@ function DongColumn({ label, rank, items }: { label: string; rank: number; items
   );
 }
 
+type ListingEvent = { type: "new" | "changed"; at: number; listing: Listing };
+const READ_KEY = "zip.alertsReadAt";
+
+function AlertList({ events, readAt }: { events: ListingEvent[]; readAt: number }) {
+  if (!events.length)
+    return (
+      <p className="py-16 text-center text-sm text-muted-foreground">
+        아직 알림이 없습니다. 원하는 조건의 새 매물이나 가격 변동이 생기면 여기에 쌓입니다.
+      </p>
+    );
+  const rank = (dong: string | null) => DONG_OPTIONS.find((d) => d.dong === dong);
+  return (
+    <div className="mx-auto max-w-3xl space-y-2">
+      {events.map((e, i) => {
+        const l = e.listing;
+        const r = rank(l.dong);
+        const unread = e.at > readAt;
+        return (
+          <a
+            key={`${l.id}-${e.at}-${i}`}
+            href={l.url}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(
+              "flex items-center gap-3 rounded-xl border border-neutral-200 bg-card p-3 transition-colors hover:bg-accent/50 dark:border-neutral-800",
+              unread && "bg-emerald-50/60 dark:bg-emerald-950/30",
+            )}
+          >
+            {unread && <span className="size-2 shrink-0 rounded-full bg-emerald-500" aria-label="읽지 않음" />}
+            {l.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={l.imageUrl} alt="" referrerPolicy="no-referrer" className="size-14 shrink-0 rounded-lg object-cover" />
+            ) : (
+              <div className="size-14 shrink-0 rounded-lg bg-muted" />
+            )}
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                {e.type === "new" ? (
+                  <Badge className="bg-emerald-600 px-1.5 text-[10px]">새 매물</Badge>
+                ) : (
+                  <Badge className="bg-amber-500 px-1.5 text-[10px]">가격 변동</Badge>
+                )}
+                {r && <Badge className={cn("px-1.5 text-[10px]", RANK_STYLE[r.rank])}>{r.rank}순위</Badge>}
+                <span className="text-muted-foreground">{r?.label ?? l.dong}</span>
+              </div>
+              <div className="truncate text-sm font-medium">{l.name}</div>
+              <div className="text-sm font-semibold">
+                {priceText(l)}
+                {e.type === "changed" && l.prevPrice !== null && (
+                  <span className="ml-1.5 text-xs font-normal text-muted-foreground line-through">{formatPrice(l.prevPrice)}{l.prevRent ? `/${l.prevRent}` : ""}</span>
+                )}
+              </div>
+            </div>
+            <span className="shrink-0 self-start text-xs text-muted-foreground">{timeAgo(e.at)}</span>
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Page() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [notify, setNotify] = useState(true);
   const [connected, setConnected] = useState(false);
   const [lastIngest, setLastIngest] = useState<number | null>(null);
+  const [events, setEvents] = useState<ListingEvent[]>([]);
+  const [readAt, setReadAt] = useState(0);
+  const [tab, setTab] = useState("listings");
   const [, tick] = useState(0);
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
@@ -213,20 +278,24 @@ export default function Page() {
       if (localStorage.getItem(NOTIFY_KEY) === "off") setNotify(false);
     } catch {}
     // 20초마다 새 매물 확인 (Vercel에서도 동작하도록 실시간 스트림 대신 주기적 조회)
-    let known: Map<string, string> | null = null;
+    try { setReadAt(Number(localStorage.getItem(READ_KEY)) || Date.now()); } catch { setReadAt(Date.now()); }
+    let lastSeenEvent: number | null = null;
     const poll = async () => {
       try {
-        const d = await (await fetch("/api/listings", { cache: "no-store" })).json();
+        const [d, ev] = await Promise.all([
+          fetch("/api/listings", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/events", { cache: "no-store" }).then((r) => r.json()),
+        ]);
         setConnected(true);
         setLastIngest(d.lastIngest);
-        const list: Listing[] = d.listings;
-        setListings(list);
-        const sig = (l: Listing) => `${l.price}/${l.rent}`;
-        if (known) {
-          const items = list.filter((l) => !known!.has(l.id) || known!.get(l.id) !== sig(l));
-          const hits = items.filter((l) => matches(l, defaultFilters));
-          for (const l of hits.slice(0, 5)) {
-            const title = known.has(l.id) ? "가격 변동" : `새 매물 · ${l.dong}`;
+        setListings(d.listings);
+        const list: ListingEvent[] = ev.events;
+        setEvents(list);
+        // 페이지를 연 뒤 새로 생긴 알림만 화면 알림·데스크톱 알림으로 띄운다
+        if (lastSeenEvent !== null) {
+          for (const e of list.filter((x) => x.at > lastSeenEvent!).slice(0, 5)) {
+            const l = e.listing;
+            const title = e.type === "changed" ? `가격 변동 · ${l.dong}` : `새 매물 · ${l.dong}`;
             const body = `${l.name} · ${priceText(l)}`;
             toast(title, { description: body, action: { label: "보기", onClick: () => window.open(l.url, "_blank") } });
             if (notifyRef.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -234,7 +303,7 @@ export default function Page() {
             }
           }
         }
-        known = new Map(list.map((l) => [l.id, sig(l)]));
+        lastSeenEvent = list[0]?.at ?? lastSeenEvent ?? 0;
       } catch {
         setConnected(false);
       }
@@ -254,6 +323,17 @@ export default function Page() {
       localStorage.setItem(NOTIFY_KEY, v ? "on" : "off");
     } catch {}
     if (v && typeof Notification !== "undefined") Notification.requestPermission();
+  };
+
+  const unread = events.filter((e) => e.at > readAt).length;
+  const onTab = (v: string) => {
+    if (tab === "alerts" && v !== "alerts") {
+      // 알림 탭을 보고 나오면 모두 읽은 것으로 처리
+      const now = Date.now();
+      setReadAt(now);
+      try { localStorage.setItem(READ_KEY, String(now)); } catch {}
+    }
+    setTab(v);
   };
 
   const byDong = useMemo(() => {
@@ -285,11 +365,27 @@ export default function Page() {
         </div>
       </header>
 
-      <main className="grid flex-1 grid-cols-1 gap-3 md:min-h-0 md:grid-cols-3">
-        {byDong.map((d) => (
-          <DongColumn key={d.dong} label={d.label} rank={d.rank} items={d.items} />
-        ))}
-      </main>
+      <Tabs value={tab} onValueChange={onTab} className="flex min-h-0 flex-1 flex-col">
+        <TabsList className="mb-3">
+          <TabsTrigger value="listings">매물</TabsTrigger>
+          <TabsTrigger value="alerts" className="gap-1.5">
+            알림
+            {unread > 0 && (
+              <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-semibold leading-4 text-white">{unread > 99 ? "99+" : unread}</span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="listings" className="min-h-0 flex-1">
+          <main className="grid h-full grid-cols-1 gap-3 md:min-h-0 md:grid-cols-3">
+            {byDong.map((d) => (
+              <DongColumn key={d.dong} label={d.label} rank={d.rank} items={d.items} />
+            ))}
+          </main>
+        </TabsContent>
+        <TabsContent value="alerts" className="min-h-0 flex-1 overflow-y-auto">
+          <AlertList events={events} readAt={readAt} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

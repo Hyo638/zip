@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "집찾기 수집기",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "네이버 부동산에서 보고 있는 매물 목록을 로컬 집찾기 사이트로 보냅니다.",
   "permissions": [
     "storage",
     "alarms",
-    "tabs"
+    "tabs",
+    "notifications"
   ],
   "host_permissions": [
     "*://*.land.naver.com/*",
@@ -18,7 +19,8 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "집찾기 수집기"
+    "default_title": "집찾기 수집기",
+    "default_icon": "icon.png"
   },
   "content_scripts": [
     {
@@ -42,5 +44,8 @@
       "run_at": "document_start",
       "all_frames": true
     }
-  ]
+  ],
+  "icons": {
+    "128": "icon.png"
+  }
 }
