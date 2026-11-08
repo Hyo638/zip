@@ -17,17 +17,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "save-template") {
-    // 어느 탭에서든 매물 목록을 열면 그 요청을 기억한다 (같은 지역은 하나만, 최근 6개까지)
+    // 동(법정동) 단위로 걸러진 매물 목록 요청만 기억한다. 동마다 1개, 최대 8개.
     (async () => {
+      let j;
+      try { j = JSON.parse(msg.req.body); } catch { return; }
+      const dongCode = j?.filter?.legalDivisionNumbers?.[0];
+      if (!dongCode) return; // 지도 화면 범위로만 걸러진 요청은 다른 동 매물이 섞이므로 쓰지 않는다
+      delete j.lastInfo;
+      if ("page" in j) j.page = 0;
+      j.filter.tradeTypes = ["B1", "B2"]; // 원하는 거래유형: 전세 + 월세
+      j.filter.realEstateTypes = ["A01", "A02"]; // 아파트 + 오피스텔
+      const body = JSON.stringify(j);
       let { templates = [] } = await chrome.storage.local.get("templates");
       if (!Array.isArray(templates)) templates = [];
-      let body = msg.req.body;
-      try { const j = JSON.parse(body); delete j.lastInfo; if ("page" in j) j.page = 0; body = JSON.stringify(j); } catch {}
-      const key = msg.req.url.split("?")[0] + "|" + body;
-      const isNew = !templates.some((t) => t.key === key);
-      templates = [{ key, req: { ...msg.req, body }, at: Date.now() }, ...templates.filter((t) => t.key !== key)].slice(0, 6);
+      const isNew = !templates.some((t) => t.key === dongCode);
+      templates = [{ key: dongCode, req: { ...msg.req, body }, at: Date.now() }, ...templates.filter((t) => t.key !== dongCode && t.key.length === 10)].slice(0, 8);
       await chrome.storage.local.set({ templates });
-      if (isNew) debug({ event: "template-saved", count: templates.length, body: (body || "").slice(0, 500), reqUrl: msg.req.url.slice(0, 200) });
+      if (isNew) debug({ event: "template-saved", dongCode, count: templates.length, body });
     })();
   }
   if (msg?.type === "clear-templates") chrome.storage.local.set({ templates: [] });
