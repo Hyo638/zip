@@ -3,7 +3,7 @@ let gotArticles = 0;
 window.addEventListener("message", (e) => {
   if (e.source !== window || e.data?.source !== "zip-ext") return;
   if (/boundedArticles|articleList|articles/i.test(e.data.url)) gotArticles++;
-  chrome.runtime.sendMessage({ type: "articles", url: e.data.url, data: e.data.data }).catch(() => {});
+  safeSend({ type: "articles", url: e.data.url, data: e.data.data });
 });
 
 // 감시 탭이면: 페이지가 뜬 뒤 매물 목록을 끝까지 자동 스크롤해서 남은 매물도 불러오게 한다.
@@ -64,5 +64,14 @@ async function autoScroll() {
 }
 
 function log(info) {
-  chrome.runtime.sendMessage({ type: "debug", info }).catch(() => {});
+  safeSend({ type: "debug", info });
+}
+
+// 확장을 업데이트하면 이미 열려 있던 탭의 예전 스크립트는 확장과 연결이 끊긴다
+// (Extension context invalidated). 이때는 조용히 멈추고, 탭이 새로고침되면 새 스크립트가 붙는다.
+function safeSend(msg) {
+  try {
+    if (!chrome.runtime?.id) return;
+    chrome.runtime.sendMessage(msg).catch(() => {});
+  } catch {}
 }

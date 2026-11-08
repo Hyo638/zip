@@ -79,8 +79,9 @@ async function refreshAll() {
   await chrome.storage.local.set({ watchTabs });
 }
 
-chrome.runtime.onInstalled.addListener(schedule);
-chrome.runtime.onStartup.addListener(schedule);
+// 설치·업데이트·크롬 시작 때: 새로고침 주기를 다시 잡고, 감시 탭을 바로 새로고침해 새 스크립트가 붙게 한다
+chrome.runtime.onInstalled.addListener(() => { schedule(); refreshAll(); });
+chrome.runtime.onStartup.addListener(() => { schedule(); refreshAll(); });
 
 async function debug(info) {
   const c = await cfg();
