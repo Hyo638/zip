@@ -95,7 +95,13 @@ function ListingCard({ l }: { l: Listing }) {
   );
 }
 
-function DongColumn({ label, items }: { label: string; items: Listing[] }) {
+const RANK_STYLE: Record<number, string> = {
+  1: "bg-amber-500 text-white",
+  2: "bg-slate-500 text-white",
+  3: "bg-orange-700 text-white",
+};
+
+function DongColumn({ label, rank, items }: { label: string; rank: number; items: Listing[] }) {
   const [sort, setSort] = useState<Sort>("latest");
   const sorted = useMemo(() => {
     const arr = [...items];
@@ -113,7 +119,10 @@ function DongColumn({ label, items }: { label: string; items: Listing[] }) {
   return (
     <section className="flex min-h-[60vh] flex-col rounded-2xl border bg-muted/40 md:min-h-0">
       <div className="rounded-t-2xl border-b bg-background px-4 py-3">
-        <h2 className="text-center text-base font-semibold">{label}</h2>
+        <h2 className="flex items-center justify-center gap-2 text-base font-semibold">
+          <Badge className={cn("px-2", RANK_STYLE[rank])}>{rank}순위</Badge>
+          {label}
+        </h2>
       </div>
       <div className="flex items-center justify-between px-4 py-3">
         <div className="text-sm font-semibold">
@@ -233,7 +242,7 @@ export default function Page() {
 
       <main className="grid flex-1 grid-cols-1 gap-3 md:min-h-0 md:grid-cols-3">
         {byDong.map((d) => (
-          <DongColumn key={d.dong} label={d.label} items={d.items} />
+          <DongColumn key={d.dong} label={d.label} rank={d.rank} items={d.items} />
         ))}
       </main>
     </div>

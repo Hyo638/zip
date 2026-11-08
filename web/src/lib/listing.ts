@@ -42,10 +42,10 @@ export type Filters = {
 };
 
 export const DONG_OPTIONS = [
-  { dong: "송도동", label: "연수구 송도동" },
-  { dong: "청라동", label: "서해구 청라동" },
-  { dong: "구월동", label: "남동구 구월동" },
-];
+  { dong: "송도동", label: "연수구 송도동", rank: 1 },
+  { dong: "구월동", label: "남동구 구월동", rank: 2 },
+  { dong: "청라동", label: "서해구 청라동", rank: 3 },
+]
 export const TRADE_OPTIONS = ["매매", "전세", "월세"];
 export const ESTATE_OPTIONS = ["아파트", "오피스텔"];
 
