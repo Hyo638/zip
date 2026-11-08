@@ -1,12 +1,15 @@
 // 페이지 → 확장 백그라운드로 전달
+let gotArticles = 0;
 window.addEventListener("message", (e) => {
   if (e.source !== window || e.data?.source !== "zip-ext") return;
+  if (/boundedArticles|articleList|articles/i.test(e.data.url)) gotArticles++;
   chrome.runtime.sendMessage({ type: "articles", url: e.data.url, data: e.data.data }).catch(() => {});
 });
 
 // 감시 탭이면: 페이지가 뜬 뒤 매물 목록을 끝까지 자동 스크롤해서 남은 매물도 불러오게 한다.
 if (window === window.top) {
   chrome.runtime.sendMessage({ type: "am-i-watched" }).then((r) => {
+    log({ event: "loaded", watched: !!r?.watched });
     if (r?.watched) setTimeout(openListThenScroll, 3000);
   }).catch(() => {});
 }
@@ -15,19 +18,19 @@ if (window === window.top) {
 async function openListThenScroll() {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   for (let i = 0; i < 10; i++) {
-    const panelOpen = [...document.querySelectorAll("h1,h2,h3,div,span")].some(
-      (el) => el.childElementCount === 0 && el.textContent.trim() === "매물 목록",
-    );
-    if (panelOpen) break;
+    // 매물 목록 응답이 이미 왔으면 목록이 열려 있는 것
+    if (gotArticles > 0) { log({ event: "list-already-loading", gotArticles }); break; }
     const btn = [...document.querySelectorAll("button, a, [role=button]")].find((el) =>
       /^매물\s*[\d,]+$/.test(el.textContent.replace(/\s+/g, " ").trim()),
     );
     if (btn) {
+      log({ event: "click-list-button", text: btn.textContent.trim() });
       btn.click();
       await sleep(2500);
       break;
     }
     await sleep(1000);
+    if (i === 9) log({ event: "list-button-not-found", buttons: [...document.querySelectorAll("button")].map((b) => b.textContent.trim()).filter((t) => t && t.length < 30).slice(0, 40) });
   }
   autoScroll();
 }
@@ -57,5 +60,9 @@ async function autoScroll() {
     stable = h === lastHeight ? stable + 1 : 0;
     lastHeight = h;
   }
-  chrome.runtime.sendMessage({ type: "scroll-done" }).catch(() => {});
+  log({ event: "scroll-done", gotArticles, height: lastHeight, list: findList()?.className?.toString().slice(0, 80) });
+}
+
+function log(info) {
+  chrome.runtime.sendMessage({ type: "debug", info }).catch(() => {});
 }

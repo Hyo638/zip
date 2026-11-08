@@ -10,6 +10,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "articles") send(msg);
+  if (msg?.type === "debug") debug({ ...msg.info, tab: sender.tab?.id, url: sender.tab?.url });
   if (msg?.type === "config-changed") schedule();
   if (msg?.type === "refresh-now") refreshAll();
 });
@@ -46,6 +47,7 @@ chrome.alarms.onAlarm.addListener((a) => {
 // 감시 주소가 있으면 그 주소들을 고정 탭으로 열어 두고 새로고침, 없으면 열린 네이버 부동산 탭 전부 새로고침
 async function refreshAll() {
   const c = await cfg();
+  debug({ event: "refreshAll", watchUrls: c.watchUrls.length, watchTabs: c.watchTabs });
   if (!c.watchUrls.length) {
     const tabs = await chrome.tabs.query({ url: "*://*.land.naver.com/*" });
     for (const t of tabs) chrome.tabs.reload(t.id);
@@ -70,3 +72,8 @@ async function refreshAll() {
 
 chrome.runtime.onInstalled.addListener(schedule);
 chrome.runtime.onStartup.addListener(schedule);
+
+async function debug(info) {
+  const c = await cfg();
+  fetch(`${c.server}/api/debug`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(info) }).catch(() => {});
+}
