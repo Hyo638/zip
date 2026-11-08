@@ -20,9 +20,7 @@ async function openListThenScroll() {
   for (let i = 0; i < 10; i++) {
     // 매물 목록 응답이 이미 왔으면 목록이 열려 있는 것
     if (gotArticles > 0) { log({ event: "list-already-loading", gotArticles }); break; }
-    const btn = [...document.querySelectorAll("button, a, [role=button]")].find((el) =>
-      /^매물\s*[\d,]+$/.test(el.textContent.replace(/\s+/g, " ").trim()),
-    );
+    const btn = findListButton();
     if (btn) {
       log({ event: "click-list-button", text: btn.textContent.trim() });
       btn.click();
@@ -30,9 +28,21 @@ async function openListThenScroll() {
       break;
     }
     await sleep(1000);
-    if (i === 9) log({ event: "list-button-not-found", buttons: [...document.querySelectorAll("button")].map((b) => b.textContent.trim()).filter((t) => t && t.length < 30).slice(0, 40) });
+    if (i === 9) log({ event: "list-button-not-found", hits: [...document.querySelectorAll("body *")].filter((el) => /매물\s*[\d,]+/.test(el.textContent) && el.textContent.length < 40).slice(-8).map((el) => el.tagName + ":" + el.textContent.trim()), buttons: [...document.querySelectorAll("button")].map((b) => b.textContent.trim()).filter((t) => t && t.length < 30).slice(0, 40) });
   }
   autoScroll();
+}
+
+// "매물 215" 글자를 가진 가장 안쪽 요소를 찾아, 눌러지는 바깥 요소(버튼/링크)가 있으면 그걸 돌려준다
+function findListButton() {
+  const re = /^매물\s*[\d,]+$/;
+  const els = [...document.querySelectorAll("body *")].filter(
+    (el) => re.test(el.textContent.replace(/\s+/g, " ").trim()) && ![...el.children].some((c) => re.test(c.textContent.replace(/\s+/g, " ").trim())),
+  );
+  // 목록 패널 제목 옆 숫자가 아니라 지도 위 버튼을 고르기 위해 화면 아래쪽에 있는 것을 우선
+  els.sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top);
+  const el = els[0];
+  return el ? el.closest("button, a, [role=button]") || el : null;
 }
 
 // 화면에서 가장 큰 스크롤 가능한 영역(=매물 목록)을 찾는다
