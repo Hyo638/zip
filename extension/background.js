@@ -7,23 +7,30 @@ async function cfg() {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "am-i-watched") {
     cfg().then(async (c) => {
-      const url = Object.keys(c.watchTabs).find((u) => c.watchTabs[u] === sender.tab?.id);
-      const { templates = {} } = await chrome.storage.local.get("templates");
-      sendResponse({ watched: !!url, template: url ? templates[url] : null });
+      const ids = c.watchUrls.map((u) => c.watchTabs[u]).filter(Boolean);
+      const watched = ids.includes(sender.tab?.id);
+      const { templates = [] } = await chrome.storage.local.get("templates");
+      // 기억된 목록 요청은 첫 번째 감시 탭 하나에서만 차례로 다시 보낸다 (중복 요청 방지)
+      const first = ids[0] === sender.tab?.id;
+      sendResponse({ watched, templates: watched && first && Array.isArray(templates) ? templates.map((t) => t.req) : [] });
     });
     return true;
   }
   if (msg?.type === "save-template") {
-    // 감시 탭에서 사용자가(또는 확장이) 목록을 열었을 때의 요청 형식을 그 감시 주소에 저장
-    cfg().then(async (c) => {
-      const url = Object.keys(c.watchTabs).find((u) => c.watchTabs[u] === sender.tab?.id);
-      if (!url) return debug({ event: "template-ignored-not-watched", tab: sender.tab?.id, watchTabs: Object.values(c.watchTabs) });
-      const { templates = {} } = await chrome.storage.local.get("templates");
-      if (!templates[url]) debug({ event: "template-saved", body: (msg.req.body || "").slice(0, 400), reqUrl: msg.req.url.slice(0, 150) });
-      templates[url] = msg.req;
+    // 어느 탭에서든 매물 목록을 열면 그 요청을 기억한다 (같은 지역은 하나만, 최근 6개까지)
+    (async () => {
+      let { templates = [] } = await chrome.storage.local.get("templates");
+      if (!Array.isArray(templates)) templates = [];
+      let body = msg.req.body;
+      try { const j = JSON.parse(body); delete j.lastInfo; if ("page" in j) j.page = 0; body = JSON.stringify(j); } catch {}
+      const key = msg.req.url.split("?")[0] + "|" + body;
+      const isNew = !templates.some((t) => t.key === key);
+      templates = [{ key, req: { ...msg.req, body }, at: Date.now() }, ...templates.filter((t) => t.key !== key)].slice(0, 6);
       await chrome.storage.local.set({ templates });
-    });
+      if (isNew) debug({ event: "template-saved", count: templates.length, body: (body || "").slice(0, 500), reqUrl: msg.req.url.slice(0, 200) });
+    })();
   }
+  if (msg?.type === "clear-templates") chrome.storage.local.set({ templates: [] });
   if (msg?.type === "articles") send(msg);
   if (msg?.type === "debug") debug({ ...msg.info, tab: sender.tab?.id, url: sender.tab?.url });
   if (msg?.type === "config-changed") schedule();

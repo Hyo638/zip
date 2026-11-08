@@ -20,11 +20,14 @@ if (window === window.top) {
     log({ event: "loaded", watched: !!r?.watched });
     if (!r?.watched) return;
     const delay = 3000 + Math.random() * 15000; // 탭끼리 겹치지 않게 무작위 지연
-    if (r.template) {
-      // 화면에 안 보이는 탭은 지도가 그려지지 않아 목록 버튼이 없다 → 기록해 둔 목록 요청을 직접 다시 보낸다
-      setTimeout(() => {
-        log({ event: "replay-start", url: r.template.url.slice(0, 120), body: (r.template.body || "").slice(0, 400) });
-        window.postMessage({ source: "zip-ext-replay", req: r.template }, "*");
+    if (r.templates?.length) {
+      // 화면에 안 보이는 탭은 지도가 그려지지 않아 목록 버튼이 없다 → 기억해 둔 목록 요청을 차례로 다시 보낸다
+      setTimeout(async () => {
+        for (const req of r.templates) {
+          log({ event: "replay-start", body: (req.body || "").slice(0, 200) });
+          window.postMessage({ source: "zip-ext-replay", req }, "*");
+          await new Promise((res) => setTimeout(res, 20000)); // 지역 하나 끝까지 받을 시간
+        }
       }, delay);
     } else {
       setTimeout(openListThenScroll, delay);
