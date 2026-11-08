@@ -212,37 +212,38 @@ export default function Page() {
     try {
       if (localStorage.getItem(NOTIFY_KEY) === "off") setNotify(false);
     } catch {}
-    fetch("/api/listings")
-      .then((r) => r.json())
-      .then((d) => {
-        setListings(d.listings);
+    // 20초마다 새 매물 확인 (Vercel에서도 동작하도록 실시간 스트림 대신 주기적 조회)
+    let known: Map<string, string> | null = null;
+    const poll = async () => {
+      try {
+        const d = await (await fetch("/api/listings", { cache: "no-store" })).json();
+        setConnected(true);
         setLastIngest(d.lastIngest);
-      });
-
-    const es = new EventSource("/api/stream");
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
-    es.addEventListener("ping", (e) => setLastIngest(JSON.parse((e as MessageEvent).data).lastIngest));
-    es.addEventListener("update", (e) => {
-      const items: Listing[] = JSON.parse((e as MessageEvent).data);
-      setListings((prev) => {
-        const map = new Map(prev.map((l) => [l.id, l]));
-        for (const it of items) map.set(it.id, it);
-        return [...map.values()];
-      });
-      const hits = items.filter((l) => matches(l, defaultFilters));
-      for (const l of hits.slice(0, 5)) {
-        const title = l.status === "changed" ? "가격 변동" : `새 매물 · ${l.dong}`;
-        const body = `${l.name} · ${priceText(l)}`;
-        toast(title, { description: body, action: { label: "보기", onClick: () => window.open(l.url, "_blank") } });
-        if (notifyRef.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
-          new Notification(`${title} — 집찾기`, { body });
+        const list: Listing[] = d.listings;
+        setListings(list);
+        const sig = (l: Listing) => `${l.price}/${l.rent}`;
+        if (known) {
+          const items = list.filter((l) => !known!.has(l.id) || known!.get(l.id) !== sig(l));
+          const hits = items.filter((l) => matches(l, defaultFilters));
+          for (const l of hits.slice(0, 5)) {
+            const title = known.has(l.id) ? "가격 변동" : `새 매물 · ${l.dong}`;
+            const body = `${l.name} · ${priceText(l)}`;
+            toast(title, { description: body, action: { label: "보기", onClick: () => window.open(l.url, "_blank") } });
+            if (notifyRef.current && typeof Notification !== "undefined" && Notification.permission === "granted") {
+              new Notification(`${title} — 집찾기`, { body });
+            }
+          }
         }
+        known = new Map(list.map((l) => [l.id, sig(l)]));
+      } catch {
+        setConnected(false);
       }
-    });
+    };
+    poll();
+    const p = setInterval(poll, 20000);
     const t = setInterval(() => tick((x) => x + 1), 15000);
     return () => {
-      es.close();
+      clearInterval(p);
       clearInterval(t);
     };
   }, []);
@@ -271,7 +272,7 @@ export default function Page() {
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Radio className={cn("size-4", connected ? "text-emerald-500" : "text-muted-foreground")} />
-            {connected ? "실시간 연결됨" : "연결 끊김"}
+            {connected ? "자동 갱신 중" : "연결 끊김"}
           </span>
           <Separator orientation="vertical" className="h-4" />
           <span>마지막 수신 {timeAgo(lastIngest)}</span>

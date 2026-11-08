@@ -1,7 +1,7 @@
-import { allListings, store } from "@/lib/store";
+import { allListings } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  return Response.json({ listings: allListings(), lastIngest: store.lastIngest });
+export async function GET() {
+  return Response.json(await allListings());
 }

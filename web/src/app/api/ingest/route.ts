@@ -2,22 +2,15 @@ import fs from "fs";
 import path from "path";
 import { ingest } from "@/lib/store";
 
-// 진단용: 최근 응답의 URL과 숫자/참거짓 값(전체 개수, 다음 페이지 여부 등)을 남긴다
-const LOG = path.join(process.cwd(), "data", "responses.log");
-function scalars(o: unknown, prefix = "", out: Record<string, unknown> = {}, depth = 0) {
-  if (!o || typeof o !== "object" || Array.isArray(o) || depth > 3) return out;
-  for (const [k, v] of Object.entries(o)) {
-    if (typeof v === "number" || typeof v === "boolean") out[prefix + k] = v;
-    else if (Array.isArray(v)) out[prefix + k + "[]"] = v.length;
-    else scalars(v, prefix + k + ".", out, depth + 1);
-  }
-  return out;
-}
+export const dynamic = "force-dynamic";
+
+// 확장만 보낼 수 있도록: INGEST_TOKEN 환경변수가 있으면 같은 값을 x-ingest-token 헤더로 보내야 한다
+const TOKEN = process.env.INGEST_TOKEN;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, x-ingest-token",
 };
 
 export function OPTIONS() {
@@ -25,11 +18,15 @@ export function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+  if (TOKEN && req.headers.get("x-ingest-token") !== TOKEN) {
+    return Response.json({ error: "unauthorized" }, { status: 401, headers: CORS });
+  }
   try {
     const body = await req.json();
-    const result = ingest(body?.data ?? body);
+    const result = await ingest(body?.data ?? body);
+    // 로컬 진단 기록 (Vercel에서는 파일을 쓸 수 없어 조용히 건너뜀)
     try {
-      fs.appendFileSync(LOG, JSON.stringify({ t: new Date().toISOString(), url: body?.url, ...result, meta: scalars(body?.data) }) + "\n");
+      fs.appendFileSync(path.join(process.cwd(), "data", "responses.log"), JSON.stringify({ t: new Date().toISOString(), url: body?.url, ...result }) + "\n");
     } catch {}
     return Response.json(result, { headers: CORS });
   } catch (e) {

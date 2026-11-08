@@ -1,4 +1,4 @@
-const DEFAULTS = { server: "http://localhost:3000", refreshMin: 0, sent: 0, lastStatus: "", watchUrls: [], watchTabs: {} };
+const DEFAULTS = { server: "http://localhost:3000", token: "", refreshMin: 0, sent: 0, lastStatus: "", watchUrls: [], watchTabs: {} };
 
 async function cfg() {
   return { ...DEFAULTS, ...(await chrome.storage.local.get(Object.keys(DEFAULTS))) };
@@ -46,16 +46,17 @@ async function send(msg) {
   try {
     const r = await fetch(`${c.server}/api/ingest`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(c.token ? { "x-ingest-token": c.token } : {}) },
       body: JSON.stringify({ url: msg.url, data: msg.data }),
     });
+    if (r.status === 401) throw new Error("토큰이 맞지 않습니다");
     const j = await r.json();
     await chrome.storage.local.set({
       sent: c.sent + (j.total || 0),
       lastStatus: `${new Date().toLocaleTimeString()} · ${j.total ?? 0}건 전송, 새/변동 ${j.changed ?? 0}건`,
     });
   } catch (e) {
-    await chrome.storage.local.set({ lastStatus: `전송 실패: 집찾기 서버(${c.server})가 켜져 있는지 확인하세요` });
+    await chrome.storage.local.set({ lastStatus: `전송 실패(${e.message}): 서버 주소(${c.server})와 토큰을 확인하세요` });
   }
 }
 
