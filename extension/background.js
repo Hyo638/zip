@@ -4,7 +4,11 @@ async function cfg() {
   return { ...DEFAULTS, ...(await chrome.storage.local.get(Object.keys(DEFAULTS))) };
 }
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "am-i-watched") {
+    cfg().then((c) => sendResponse({ watched: Object.values(c.watchTabs).includes(sender.tab?.id) }));
+    return true;
+  }
   if (msg?.type === "articles") send(msg);
   if (msg?.type === "config-changed") schedule();
   if (msg?.type === "refresh-now") refreshAll();
@@ -58,7 +62,8 @@ async function refreshAll() {
       tab = await chrome.tabs.create({ url, active: false, pinned: true });
     }
     watchTabs[url] = tab.id;
-    await new Promise((r) => setTimeout(r, 3000)); // 네이버에 한꺼번에 요청하지 않도록 간격 두기
+    await chrome.storage.local.set({ watchTabs: { ...c.watchTabs, ...watchTabs } }); // 탭이 뜨기 전에 감시 탭으로 등록
+    await new Promise((r) => setTimeout(r, 15000)); // 한 탭의 자동 스크롤이 어느 정도 끝난 뒤 다음 탭으로
   }
   await chrome.storage.local.set({ watchTabs });
 }
