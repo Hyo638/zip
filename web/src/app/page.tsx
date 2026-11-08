@@ -84,53 +84,56 @@ function ListingCard({ l }: { l: Listing }) {
           <div className="text-[13px] text-muted-foreground">
             {[l.estateType, area, l.floor && `${l.floor}층`, l.direction].filter(Boolean).join(" | ")}
           </div>
-          {(() => {
-            const st = nearestStation(l);
-            const c = commute(l);
-            if (!st && !c) return null;
-            return (
-              <div className="w-fit space-y-0.5 rounded-[4px] bg-muted px-2 py-1.5">
-                {st && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <TrainFront className="size-3.5" />
-                    {st.name}역 도보 {st.minutes}분
-                    <span className="text-muted-foreground/70">({st.meters >= 1000 ? `${(st.meters / 1000).toFixed(1)}km` : `${st.meters}m`})</span>
-                  </div>
-                )}
-                {c && (
-                  <div
-                    role="link"
-                    tabIndex={0}
-                    title="구글 지도에서 대중교통 경로 보기"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(commuteUrl(l), "_blank", "noopener"); }}
-                    className="flex w-fit cursor-pointer items-center gap-1 text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
-                  >
-                    <Briefcase className="size-3.5" />
-                    직장까지 약 {c.minutes}분{c.walkOnly ? " (도보)" : c.byBus ? " (버스+지하철)" : " (지하철)"}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-          {l.mgmtFee ? <div className="text-xs text-muted-foreground">관리비 {l.mgmtFee}만</div> : null}
-          {l.brokerCount && l.brokerCount > 1 ? (
-            <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400">중개사 {l.brokerCount}곳에서 등록</div>
-          ) : null}
-          <div className="flex flex-wrap gap-1 pt-0.5">
-            {l.verification && l.verification !== "확인매물" && (
-              <span className={cn("rounded px-1.5 py-0.5 text-xs", l.verification === "집주인" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300")}>
-                {l.verification}
-              </span>
-            )}
-            {l.confirmed && (
-              <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600 dark:bg-red-950 dark:text-red-300">확인매물 {formatDate(l.confirmed)}</span>
-            )}
-          </div>
         </div>
         {l.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={l.imageUrl} alt="" referrerPolicy="no-referrer" className="size-20 shrink-0 rounded-lg object-cover" />
         )}
+      </div>
+      {/* 아래 정보는 사진 옆이 아니라 카드 폭 전체를 쓴다 */}
+      <div className="mt-2 space-y-1">
+        {(() => {
+          const st = nearestStation(l);
+          const c = commute(l);
+          if (!st && !c) return null;
+          return (
+            <div className="w-full space-y-0.5 rounded-[4px] bg-muted px-2 py-1.5">
+              {st && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <TrainFront className="size-3.5" />
+                  {st.name}역 도보 {st.minutes}분
+                  <span className="text-muted-foreground/70">({st.meters >= 1000 ? `${(st.meters / 1000).toFixed(1)}km` : `${st.meters}m`})</span>
+                </div>
+              )}
+              {c && (
+                <div
+                  role="link"
+                  tabIndex={0}
+                  title="구글 지도에서 대중교통 경로 보기"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(commuteUrl(l), "_blank", "noopener"); }}
+                  className="flex w-fit cursor-pointer items-center gap-1 text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
+                >
+                  <Briefcase className="size-3.5" />
+                  직장까지 약 {c.minutes}분{c.walkOnly ? " (도보)" : c.byBus ? " (버스+지하철)" : " (지하철)"}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        {l.mgmtFee ? <div className="text-xs text-muted-foreground">관리비 {l.mgmtFee}만</div> : null}
+        {l.brokerCount && l.brokerCount > 1 ? (
+          <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400">중개사 {l.brokerCount}곳에서 등록</div>
+        ) : null}
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {l.verification && l.verification !== "확인매물" && (
+            <span className={cn("rounded px-1.5 py-0.5 text-xs", l.verification === "집주인" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300")}>
+              {l.verification}
+            </span>
+          )}
+          {l.confirmed && (
+            <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600 dark:bg-red-950 dark:text-red-300">확인매물 {formatDate(l.confirmed)}</span>
+          )}
+        </div>
       </div>
     </a>
   );
