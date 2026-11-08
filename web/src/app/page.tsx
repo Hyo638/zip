@@ -72,6 +72,9 @@ function ListingCard({ l }: { l: Listing }) {
             {[l.estateType, area, l.floor && `${l.floor}층`, l.direction].filter(Boolean).join(" | ")}
           </div>
           {l.mgmtFee ? <div className="text-xs text-muted-foreground">관리비 {l.mgmtFee}만</div> : null}
+          {l.brokerCount && l.brokerCount > 1 ? (
+            <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400">중개사 {l.brokerCount}곳에서 등록</div>
+          ) : null}
           <div className="flex flex-wrap gap-1 pt-0.5">
             {l.verification && l.verification !== "확인매물" && (
               <span className={cn("rounded px-1.5 py-0.5 text-xs", l.verification === "집주인" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300")}>

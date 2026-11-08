@@ -13,6 +13,7 @@ export type Listing = {
   imageUrl: string | null;
   area: number | null; // 전용면적 ㎡
   supplyArea?: number | null; // 공급(오피스텔은 계약)면적 ㎡
+  brokerCount?: number; // 같은 집을 올린 중개사 수
   verification?: string | null; // 집주인 | 현장 | 확인매물
   floor: string | null;
   direction: string | null;

@@ -42,15 +42,47 @@ const ESTATE: Record<string, string> = { A01: "아파트", APT: "아파트", A02
 
 const TRADE: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기임대" };
 
-/** 응답 JSON 어디에 있든 매물 객체를 찾아낸다 (네이버 응답 형식이 바뀌어도 버티도록). */
-export function extractArticles(data: unknown, out: Raw[] = [], depth = 0): Raw[] {
+const isArticle = (o: Raw) =>
+  ID_KEYS.some((k) => o[k] !== undefined) &&
+  !!(pick(o, ["articleName", "complexName", "atclNm", "articleTitle"]) || pick(o, PRICE_KEYS));
+
+function collect(data: unknown, out: Raw[], depth: number): Raw[] {
   if (depth > 8 || data === null || typeof data !== "object") return out;
   if (Array.isArray(data)) {
-    for (const d of data) extractArticles(d, out, depth + 1);
+    for (const d of data) collect(d, out, depth + 1);
     return out;
   }
   const o = data as Raw;
-  if (ID_KEYS.some((k) => o[k] !== undefined) && (pick(o, ["articleName", "complexName", "atclNm", "articleTitle"]) || pick(o, PRICE_KEYS))) {
+  if (isArticle(o)) {
+    out.push(o);
+    return out;
+  }
+  for (const v of Object.values(o)) collect(v, out, depth + 1);
+  return out;
+}
+
+/**
+ * 응답 JSON 어디에 있든 매물 객체를 찾아낸다 (네이버 응답 형식이 바뀌어도 버티도록).
+ * 네이버는 같은 집을 여러 중개사가 올리면 목록 한 칸에 묶어서 보내므로,
+ * 목록 한 칸(배열 원소) 안에서 나온 매물은 첫 번째(대표 매물)만 쓰고 개수는 brokerCount로 남긴다.
+ */
+export function extractArticles(data: unknown, out: Raw[] = [], depth = 0): Raw[] {
+  if (depth > 8 || data === null || typeof data !== "object") return out;
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (item && typeof item === "object" && !Array.isArray(item) && !isArticle(item as Raw)) {
+        const found = collect(item, [], 0);
+        if (found.length) {
+          out.push({ ...found[0], __brokerCount: new Set(found.map((f) => String(pick(f, ID_KEYS)))).size });
+          continue;
+        }
+      }
+      extractArticles(item, out, depth + 1);
+    }
+    return out;
+  }
+  const o = data as Raw;
+  if (isArticle(o)) {
     out.push(o);
     return out;
   }
@@ -99,6 +131,7 @@ export function normalize(o: Raw, now: number): Listing | null {
       const v = Number(ESTATE[String(o.realEstateType)] === "오피스텔" ? sp.contractSpace || sp.supplySpace : sp.supplySpace || sp.contractSpace);
       return v > 0 ? v : null;
     })(),
+    brokerCount: typeof o.__brokerCount === "number" ? o.__brokerCount : 1,
     verification: (() => {
       const t = str((o.verificationInfo as Raw | undefined)?.verificationType);
       if (!t) return null;
