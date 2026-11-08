@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font: 13px -apple-system, system-ui, sans-serif; width: 280px; margin: 0; padding: 14px; color: #0a0a0a; }
+  h1 { font-size: 15px; margin: 0 0 10px; }
+  label { display: block; margin: 10px 0 4px; font-weight: 500; }
+  input, select { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #e5e5e5; border-radius: 6px; font: inherit; }
+  button { margin-top: 12px; width: 100%; padding: 7px; border: 0; border-radius: 6px; background: #171717; color: #fff; font: inherit; cursor: pointer; }
+  .muted { color: #737373; font-size: 12px; margin-top: 10px; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <h1>집찾기 수집기</h1>
+  <label for="server">집찾기 서버 주소</label>
+  <input id="server" />
+  <label for="refresh">네이버 탭 자동 새로고침</label>
+  <select id="refresh">
+    <option value="0">끄기</option>
+    <option value="3">3분마다</option>
+    <option value="5">5분마다</option>
+    <option value="10">10분마다</option>
+    <option value="30">30분마다</option>
+  </select>
+  <button id="save">저장</button>
+  <div class="muted" id="status"></div>
+  <div class="muted">네이버 부동산에서 원하는 지역·단지의 매물 목록을 열어 두면 화면에 받은 매물이 자동으로 전송됩니다.</div>
+  <script src="popup.js"></script>
+</body>
+</html>
