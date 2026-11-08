@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bell, Home, Radio, TrainFront } from "lucide-react";
+import { Bell, Briefcase, Home, Radio, TrainFront } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { DONG_OPTIONS, defaultFilters, formatPrice, matches, nearestStation, type Listing } from "@/lib/listing";
+import { DONG_OPTIONS, OFFICE, commute, commuteUrl, defaultFilters, formatPrice, matches, nearestStation, type Listing } from "@/lib/listing";
 import { cn } from "@/lib/utils";
 
 const NOTIFY_KEY = "zip.notify";
@@ -91,6 +91,21 @@ function ListingCard({ l }: { l: Listing }) {
                 <TrainFront className="size-3.5" />
                 {st.name}역 도보 {st.minutes}분
                 <span className="text-muted-foreground/70">({st.meters >= 1000 ? `${(st.meters / 1000).toFixed(1)}km` : `${st.meters}m`})</span>
+              </div>
+            ) : null;
+          })()}
+          {(() => {
+            const c = commute(l);
+            return c ? (
+              <div
+                role="link"
+                tabIndex={0}
+                title="구글 지도에서 대중교통 경로 보기"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(commuteUrl(l), "_blank", "noopener"); }}
+                className="flex w-fit cursor-pointer items-center gap-1 text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
+              >
+                <Briefcase className="size-3.5" />
+                직장까지 약 {c.minutes}분{c.walkOnly ? " (도보)" : c.byBus ? " (버스+지하철)" : " (지하철)"}
               </div>
             ) : null;
           })()}
@@ -245,7 +260,7 @@ export default function Page() {
         <div className="flex items-center gap-2">
           <Home className="size-5" />
           <h1 className="text-xl font-semibold tracking-tight">집찾기</h1>
-          <span className="hidden text-sm text-muted-foreground sm:inline">아파트·오피스텔 · 월세</span>
+          <span className="hidden text-sm text-muted-foreground sm:inline">아파트·오피스텔 · 월세 · 직장 {OFFICE.name}</span>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">

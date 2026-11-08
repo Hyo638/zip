@@ -116,3 +116,41 @@ export function nearestStation(l: Listing): { name: string; minutes: number; met
   const walk = best.d * 1.3;
   return { name: best.name, meters: Math.round(walk), minutes: Math.max(1, Math.round(walk / 70)) };
 }
+
+// 직장: 송도 테크노파크 IT센터 (인천1호선 테크노파크역 바로 앞)
+export const OFFICE = { name: "송도 테크노파크 IT센터", lat: 37.3821, lon: 126.6566, station: "테크노파크", walkFromStation: 3 };
+
+// 인천1호선 역 (테크노파크역까지 갈아타지 않고 가는 역)
+const LINE1 = ["계양", "귤현", "박촌", "임학", "계산", "경인교대입구", "작전", "갈산", "부평구청", "부평시장", "부평", "동수", "부평삼거리", "간석오거리", "인천시청", "예술회관", "인천터미널", "문학경기장", "선학", "신연수", "원인재", "동춘", "동막", "캠퍼스타운", "테크노파크", "지식정보단지", "인천대입구", "센트럴파크", "국제업무지구", "송도달빛축제공원"];
+
+const meters = (aLat: number, aLon: number, bLat: number, bLon: number) =>
+  Math.hypot((aLat - bLat) * 111_000, (aLon - bLon) * 111_000 * Math.cos((aLat * Math.PI) / 180));
+
+/**
+ * 직장까지 대중교통 소요시간 어림값(분).
+ * 가까우면 걸어서, 아니면 [역까지 도보 + 대기 + 지하철 + (환승) + 역에서 직장까지 도보].
+ * 인천1호선은 역 간 약 2분, 다른 노선은 직선거리 기준 평균 시속 35km와 환승 8분으로 잡는다.
+ */
+export function commute(l: Listing): { minutes: number; walkOnly: boolean; byBus: boolean } | null {
+  if (l.lat == null || l.lon == null) return null;
+  const direct = meters(l.lat, l.lon, OFFICE.lat, OFFICE.lon) * 1.3;
+  const walkDirect = Math.round(direct / 70);
+  const st = nearestStation(l);
+  if (!st) return null;
+  let ride: number;
+  const i = LINE1.indexOf(st.name), j = LINE1.indexOf(OFFICE.station);
+  if (i >= 0) ride = Math.abs(i - j) * 2;
+  else {
+    const s = STATIONS.find(([n]) => n === st.name)!;
+    ride = Math.round((meters(s[1], s[2], OFFICE.lat, OFFICE.lon) * 1.25) / 583) + 8;
+  }
+  // 역까지 걸어서 15분이 넘으면 마을버스·버스로 역까지 간다고 본다 (분당 250m + 대기 5분)
+  const byBus = st.minutes > 15;
+  const access = byBus ? Math.round(st.meters / 250) + 5 : st.minutes;
+  const transit = access + 4 + ride + OFFICE.walkFromStation;
+  if (walkDirect <= transit || walkDirect <= 15) return { minutes: Math.max(1, walkDirect), walkOnly: true, byBus: false };
+  return { minutes: transit, walkOnly: false, byBus };
+}
+
+export const commuteUrl = (l: Listing) =>
+  `https://www.google.com/maps/dir/?api=1&origin=${l.lat},${l.lon}&destination=${encodeURIComponent(OFFICE.name)}&travelmode=transit`;
