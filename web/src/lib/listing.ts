@@ -42,7 +42,6 @@ export type Filters = {
 
 export const DONG_OPTIONS = [
   { dong: "송도동", label: "연수구 송도동" },
-  { dong: "용현동", label: "미추홀구 용현동" },
   { dong: "청라동", label: "서해구 청라동" },
   { dong: "구월동", label: "남동구 구월동" },
 ];
@@ -52,7 +51,7 @@ export const ESTATE_OPTIONS = ["아파트", "오피스텔"];
 export const defaultFilters: Filters = {
   tradeTypes: ["전세", "월세"],
   estateTypes: ["아파트", "오피스텔"],
-  dongs: ["송도동", "용현동", "청라동", "구월동"],
+  dongs: ["송도동", "청라동", "구월동"],
   priceMin: "",
   priceMax: "",
   rentMax: "",

@@ -224,7 +224,7 @@ export default function Page() {
         </div>
       </header>
 
-      <main className="grid flex-1 grid-cols-1 gap-3 md:min-h-0 md:grid-cols-2 xl:grid-cols-4">
+      <main className="grid flex-1 grid-cols-1 gap-3 md:min-h-0 md:grid-cols-3">
         {byDong.map((d) => (
           <DongColumn key={d.dong} label={d.label} items={d.items} />
         ))}
