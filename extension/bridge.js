@@ -2,7 +2,10 @@
 let gotArticles = 0;
 window.addEventListener("message", (e) => {
   if (e.source !== window) return;
-  if (e.data?.source === "zip-ext-req") safeSend({ type: "save-template", req: e.data.req });
+  if (e.data?.source === "zip-ext-req") {
+    log({ event: "list-request-seen", method: e.data.req.method, hasBody: !!e.data.req.body });
+    safeSend({ type: "save-template", req: e.data.req });
+  }
   if (e.data?.source === "zip-ext-log") log(e.data.info);
 });
 window.addEventListener("message", (e) => {
