@@ -86,28 +86,31 @@ function ListingCard({ l }: { l: Listing }) {
           </div>
           {(() => {
             const st = nearestStation(l);
-            return st ? (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <TrainFront className="size-3.5" />
-                {st.name}역 도보 {st.minutes}분
-                <span className="text-muted-foreground/70">({st.meters >= 1000 ? `${(st.meters / 1000).toFixed(1)}km` : `${st.meters}m`})</span>
-              </div>
-            ) : null;
-          })()}
-          {(() => {
             const c = commute(l);
-            return c ? (
-              <div
-                role="link"
-                tabIndex={0}
-                title="구글 지도에서 대중교통 경로 보기"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(commuteUrl(l), "_blank", "noopener"); }}
-                className="flex w-fit cursor-pointer items-center gap-1 text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
-              >
-                <Briefcase className="size-3.5" />
-                직장까지 약 {c.minutes}분{c.walkOnly ? " (도보)" : c.byBus ? " (버스+지하철)" : " (지하철)"}
+            if (!st && !c) return null;
+            return (
+              <div className="w-fit space-y-0.5 rounded-[4px] bg-muted px-2 py-1.5">
+                {st && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <TrainFront className="size-3.5" />
+                    {st.name}역 도보 {st.minutes}분
+                    <span className="text-muted-foreground/70">({st.meters >= 1000 ? `${(st.meters / 1000).toFixed(1)}km` : `${st.meters}m`})</span>
+                  </div>
+                )}
+                {c && (
+                  <div
+                    role="link"
+                    tabIndex={0}
+                    title="구글 지도에서 대중교통 경로 보기"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(commuteUrl(l), "_blank", "noopener"); }}
+                    className="flex w-fit cursor-pointer items-center gap-1 text-xs font-medium text-sky-700 hover:underline dark:text-sky-400"
+                  >
+                    <Briefcase className="size-3.5" />
+                    직장까지 약 {c.minutes}분{c.walkOnly ? " (도보)" : c.byBus ? " (버스+지하철)" : " (지하철)"}
+                  </div>
+                )}
               </div>
-            ) : null;
+            );
           })()}
           {l.mgmtFee ? <div className="text-xs text-muted-foreground">관리비 {l.mgmtFee}만</div> : null}
           {l.brokerCount && l.brokerCount > 1 ? (
